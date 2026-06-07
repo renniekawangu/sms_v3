@@ -30,6 +30,11 @@ function Classrooms() {
       setLoading(true)
       setError(null)
       
+      const normalizeStudentResponse = (resp) => {
+        if (Array.isArray(resp)) return resp
+        return resp?.students || resp?.data || []
+      }
+
       // For teachers, fetch only their classrooms
       if (user?.role === 'teacher') {
         const [classroomsData, studentsResp, coursesData] = await Promise.all([
@@ -41,7 +46,7 @@ function Classrooms() {
         setClassrooms(classroomList)
         setTeachers([]) // Teachers don't need teacher list
         
-        const studentList = (studentsResp.students || []).map(s => ({
+        const studentList = normalizeStudentResponse(studentsResp).map(s => ({
           _id: s._id,
           name: s.name || [s.firstName, s.lastName].filter(Boolean).join(' ').trim() || s.email || 'Student'
         }))
@@ -75,7 +80,7 @@ function Classrooms() {
         }))
         setTeachers(teacherList)
         // Normalize students to {_id, name}
-        const studentList = (studentsResp.students || []).map(s => ({
+        const studentList = normalizeStudentResponse(studentsResp).map(s => ({
           _id: s._id,
           name: s.name || [s.firstName, s.lastName].filter(Boolean).join(' ').trim() || s.email || 'Student'
         }))
