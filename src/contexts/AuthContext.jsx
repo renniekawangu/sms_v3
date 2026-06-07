@@ -4,7 +4,21 @@ import { authApi, AUTH_LOGOUT_EVENT } from '../services/api'
 import { auth } from '../services/firebaseConfig'
 import { ROLE_PERMISSIONS, ROLES, canAccessRoute, requiresSelfAccessOnly } from '../config/rbac'
 
-const AuthContext = createContext(null)
+const defaultAuthContext = {
+  user: null,
+  login: async () => ({ success: false, error: 'Auth provider unavailable' }),
+  logout: async () => {},
+  isAuthenticated: false,
+  loading: true,
+  permissions: [],
+  hasPermission: () => false,
+  hasAnyPermission: () => false,
+  hasAllPermissions: () => false,
+  canAccess: () => false,
+  isSelfAccessOnly: () => false,
+}
+
+const AuthContext = createContext(defaultAuthContext)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -165,7 +179,8 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    console.error('useAuth must be used within an AuthProvider')
+    return defaultAuthContext
   }
   return context
 }

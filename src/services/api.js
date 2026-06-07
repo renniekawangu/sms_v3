@@ -3,7 +3,7 @@ import { signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase
 import { jsPDF } from 'jspdf'
 import { auth, db } from './firebaseConfig'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
 const USE_FIRESTORE = Boolean(import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_PROJECT_ID)
 
@@ -230,8 +230,9 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
 
   // Generic CRUD
   const isResultsPendingRoute = resource === 'results' && segments.length === 2 && first === 'pending' && method === 'GET'
+  const isFirestoreCrudResource = resource !== 'settings' && resource !== 'admin' && resource !== 'timetable' && ['students', 'teachers', 'classrooms', 'subjects', 'exams', 'fees', 'payments', 'expenses', 'issues', 'users', 'roles', 'academicYears', 'feeStructures', 'holidays', 'timetableSchedules', 'timetableInstructors', 'timetableCourses', 'results', 'homework', 'attendance'].includes(collectionName) && !isResultsPendingRoute
 
-  if (resource !== 'settings' && ['students', 'teachers', 'classrooms', 'subjects', 'exams', 'fees', 'payments', 'expenses', 'issues', 'users', 'roles', 'academicYears', 'feeStructures', 'holidays', 'timetableSchedules', 'timetableInstructors', 'timetableCourses', 'results', 'homework', 'attendance'].includes(collectionName) && !isResultsPendingRoute) {
+  if (isFirestoreCrudResource) {
     if (method === 'GET' && segments.length === 1) {
       return listDocuments(collectionName, queryParams)
     }
@@ -269,6 +270,25 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     }
     if (first === 'schedules' && segments.length === 3 && method === 'DELETE') {
       return deleteDocument('timetableSchedules', second)
+    }
+
+    if (first === 'courses' && segments.length === 2 && method === 'GET') {
+      return listDocuments('timetableCourses', queryParams)
+    }
+    if (first === 'courses' && segments.length === 3 && method === 'GET') {
+      return getDocumentById('timetableCourses', second)
+    }
+    if (first === 'courses' && second === 'classroom' && third && method === 'GET') {
+      return listDocuments('timetableCourses', { classroomId: third, ...queryParams })
+    }
+    if (first === 'courses' && segments.length === 2 && method === 'POST') {
+      return createDocument('timetableCourses', body)
+    }
+    if (first === 'courses' && segments.length === 3 && method === 'PUT') {
+      return updateDocument('timetableCourses', second, body)
+    }
+    if (first === 'courses' && segments.length === 3 && method === 'DELETE') {
+      return deleteDocument('timetableCourses', second)
     }
   }
 
@@ -635,9 +655,15 @@ const parseRequestBody = (body) => {
 export const apiCall = async (endpoint, options = {}) => {
   const body = parseRequestBody(options.body)
 
+  const [path, queryString] = endpoint.split('?')
+  const queryParams = {
+    ...Object.fromEntries(new URLSearchParams(queryString || '')),
+    ...options.queryParams,
+  }
+
   if (USE_FIRESTORE) {
     try {
-      return await firestoreRequest(options.method || 'GET', endpoint, body)
+      return await firestoreRequest(options.method || 'GET', path, body, queryParams)
     } catch (error) {
       if (error instanceof Error) {
         throw error
