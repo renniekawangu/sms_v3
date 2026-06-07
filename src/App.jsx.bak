@@ -1,0 +1,267 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import { ToastProvider } from './contexts/ToastContext'
+import ErrorBoundary from './components/ErrorBoundary'
+import ProtectedRoute from './components/ProtectedRoute'
+import Layout from './components/Layout'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import AdminPanel from './pages/AdminPanel'
+import RoleManagement from './pages/RoleManagement'
+import Students from './pages/Students'
+import Teachers from './pages/Teachers'
+import Staffs from './pages/Staffs'
+import Classrooms from './pages/Classrooms'
+import Subjects from './pages/Subjects'
+import Timetable from './pages/Timetable'
+import Exams from './pages/Exams'
+import Results from './pages/Results'
+import Attendance from './pages/Attendance'
+import Fees from './pages/Fees'
+import Payments from './pages/Payments'
+import Expenses from './pages/Expenses'
+import Issues from './pages/Issues'
+import Settings from './pages/Settings'
+import UsersManagement from './pages/UsersManagement'
+import { PermissionGate } from './components/PermissionGate'
+import { PERMISSIONS } from './config/permissions'
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+          
+              {/* Dashboard */}
+              <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin Panel - accessible to admin only */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <AdminPanel />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Role Management - accessible to admin only */}
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <PermissionGate permission={PERMISSIONS.ROLES_VIEW}>
+                    <RoleManagement />
+                  </PermissionGate>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Users Management - accessible to admin only */}
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <UsersManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Students - accessible to admin and accounts */
+          <Route
+            path="/students"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Students />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Teachers - accessible to admin */}
+          <Route
+            path="/teachers"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Teachers />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Staffs - accessible to admin and head-teacher */}
+          <Route
+            path="/staffs"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Staffs />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Classrooms - accessible to all authenticated users */}
+          <Route
+            path="/classrooms"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Classrooms />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Subjects - accessible to all authenticated users */}
+          <Route
+            path="/subjects"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Subjects />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Timetable - accessible to all authenticated users */}
+          <Route
+            path="/timetable"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Timetable />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Exams - accessible to admin */}
+          <Route
+            path="/exams"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Exams />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Results - accessible to all authenticated users */}
+          <Route
+            path="/results"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Results />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Attendance - accessible to all authenticated users */}
+          <Route
+            path="/attendance"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Attendance />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fees - accessible to admin and accounts */}
+          <Route
+            path="/fees"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Fees />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Payments - accessible to admin and accounts */}
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Payments />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Expenses - accessible to admin and accounts */}
+          <Route
+            path="/expenses"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Expenses />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Issues - accessible to all authenticated users */}
+          <Route
+            path="/issues"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Issues />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Settings - accessible to admin */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PermissionGate permission={PERMISSIONS.SETTINGS_VIEW}>
+                    <Settings />
+                  </PermissionGate>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
+  )
+}
+
+export default App

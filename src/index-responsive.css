@@ -1,0 +1,227 @@
+/* Mobile-First Responsive Utilities and Overrides */
+
+/* Prevent layout shift and overflow issues on mobile */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure modal doesn't cause viewport issues */
+body.modal-open {
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Fix for iOS Safari viewport issues */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+}
+
+/* Mobile viewport safety */
+@media (max-width: 640px) {
+  /* Prevent zoom on input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  
+  /* Ensure buttons don't get zoomed */
+  button {
+    font-size: 14px;
+  }
+}
+
+/* Ensure full viewport coverage */
+main, .main-content, [role="main"] {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Tables - Mobile Card View on Small Screens */
+@media (max-width: 768px) {
+  .responsive-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .responsive-table table {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table tbody {
+    display: block;
+  }
+
+  .responsive-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: white;
+  }
+
+  .responsive-table td {
+    display: block;
+    padding: 0.5rem 0 !important;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .responsive-table td:before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #1f2937;
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .responsive-table td:last-child {
+    border-bottom: none;
+  }
+}
+
+/* Grid - Stack on Mobile */
+.responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Flex - Stack on Mobile */
+.responsive-flex {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .responsive-flex {
+    flex-direction: row;
+    gap: 1.5rem;
+  }
+}
+
+/* Touch-friendly buttons */
+button, [role="button"], a.button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Overflow handling for mobile */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Modal responsive */
+@media (max-width: 640px) {
+  .modal-content {
+    margin: auto 1rem !important;
+    max-height: calc(100vh - 2rem) !important;
+  }
+}
+
+/* Form responsive */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.form-grid.full {
+  grid-column: 1 / -1;
+}
+
+/* Card responsive spacing */
+.card-responsive {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .card-responsive {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .card-responsive {
+    padding: 2rem;
+  }
+}
+
+/* Text responsive sizing */
+.text-responsive-sm {
+  font-size: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .text-responsive-sm {
+    font-size: 1rem;
+  }
+}
+
+.text-responsive-lg {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .text-responsive-lg {
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .text-responsive-lg {
+    font-size: 1.875rem;
+  }
+}

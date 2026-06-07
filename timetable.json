@@ -1,0 +1,91 @@
+{
+  "config": {
+    "days": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+    "academicYear": "2025",
+    "term": "Term 1"
+  },
+
+  "timeSlots": [
+    { "_id": "ts1", "startTime": "08:00", "endTime": "09:00" },
+    { "_id": "ts2", "startTime": "09:00", "endTime": "10:00" },
+    { "_id": "ts3", "startTime": "10:00", "endTime": "11:00" },
+    { "_id": "ts4", "startTime": "11:00", "endTime": "12:00" },
+    { "_id": "ts5", "startTime": "13:00", "endTime": "14:00" },
+    { "_id": "ts6", "startTime": "14:00", "endTime": "15:00" }
+  ],
+
+  "classes": [
+    {
+      "_id": "class1",
+      "name": "Grade 10A",
+      "grade": "Grade 10"
+    }
+  ],
+
+  "subjects": [
+    { "_id": "sub1", "name": "Mathematics", "code": "MATH" },
+    { "_id": "sub2", "name": "English", "code": "ENG" },
+    { "_id": "sub3", "name": "Biology", "code": "BIO" },
+    { "_id": "sub4", "name": "Computer Studies", "code": "CS" }
+  ],
+
+  "teachers": [
+    { "_id": "t1", "name": "Mr. Phiri", "email": "phiri@school.com" },
+    { "_id": "t2", "name": "Ms. Banda", "email": "banda@school.com" },
+    { "_id": "t3", "name": "Mr. Tembo", "email": "tembo@school.com" }
+  ],
+
+  "rooms": [
+    { "_id": "r1", "name": "Room 12", "type": "CLASSROOM" },
+    { "_id": "r2", "name": "Room 5", "type": "CLASSROOM" },
+    { "_id": "r3", "name": "Lab 1", "type": "LAB" }
+  ],
+
+  "timetables": [
+    {
+      "_id": "tt1",
+      "class": "class1",
+      "academicYear": "2025",
+      "term": "Term 1"
+    }
+  ],
+
+  "timetableEntries": [
+    {
+      "_id": "e1",
+      "timetable": "tt1",
+      "day": "MONDAY",
+      "timeSlot": "ts1",
+      "subject": "sub1",
+      "teacher": "t1",
+      "room": "r1"
+    },
+    {
+      "_id": "e2",
+      "timetable": "tt1",
+      "day": "MONDAY",
+      "timeSlot": "ts2",
+      "subject": "sub2",
+      "teacher": "t2",
+      "room": "r2"
+    },
+    {
+      "_id": "e3",
+      "timetable": "tt1",
+      "day": "TUESDAY",
+      "timeSlot": "ts1",
+      "subject": "sub3",
+      "teacher": "t3",
+      "room": "r3"
+    },
+    {
+      "_id": "e4",
+      "timetable": "tt1",
+      "day": "WEDNESDAY",
+      "timeSlot": "ts3",
+      "subject": "sub4",
+      "teacher": "t1",
+      "room": "r1"
+    }
+  ]
+}
