@@ -1,4 +1,5 @@
 import { useAuth } from '../contexts/AuthContext'
+import { ROLES } from '../config/rbac'
 import { useSettings } from '../contexts/SettingsContext'
 import { Link } from 'react-router-dom'
 import { GraduationCap, User, Users, School, FileText, Award, DollarSign, Calendar, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
@@ -887,19 +888,19 @@ function HeadTeacherDashboard (){
 // Main Dashboard Component
 function Dashboard() {
   const { user } = useAuth()
-  const userRole = user?.role || 'admin'
+  const userRole = user?.role || ROLES.ADMIN
 
-  if (userRole === 'admin') {
+  if (userRole === ROLES.ADMIN) {
     return <AdminDashboard />
-  } else if (userRole === 'teacher') {
+  } else if (userRole === ROLES.TEACHER) {
     return <TeacherDashboard />
-  } else if (userRole === 'student') {
+  } else if (userRole === ROLES.STUDENT) {
     return <StudentDashboard />
-  } else if (userRole === 'accounts') {
+  } else if (userRole === ROLES.ACCOUNTS) {
     return <AccountsDashboard />
-  } else if (userRole === 'parent') {
+  } else if (userRole === ROLES.PARENT) {
     return <ParentDashboard />
-  } else if (userRole === 'head-teacher') {
+  } else if (userRole === ROLES.HEAD_TEACHER) {
     return <HeadTeacherDashboard />
   }
 

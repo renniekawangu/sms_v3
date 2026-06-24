@@ -3,6 +3,7 @@ import { Users, Plus, Edit2, Trash2, Search, Mail, UserCheck } from 'lucide-reac
 import { useToast } from '../contexts/ToastContext'
 import usersApi from '../services/usersApi'
 import UserForm from '../components/UserForm'
+import { ROLES } from '../config/rbac'
 
 function UsersManagement() {
   const [users, setUsers] = useState([])
@@ -83,14 +84,20 @@ function UsersManagement() {
   })
 
   const getRoleBadgeColor = (role) => {
-    const colors = {
-      admin: 'bg-purple-100 text-purple-800',
-      'head-teacher': 'bg-blue-100 text-blue-800',
-      teacher: 'bg-green-100 text-green-800',
-      accounts: 'bg-yellow-100 text-yellow-800',
-      student: 'bg-gray-100 text-gray-800'
+    switch (role) {
+      case ROLES.ADMIN:
+        return 'bg-purple-100 text-purple-800'
+      case ROLES.HEAD_TEACHER:
+        return 'bg-blue-100 text-blue-800'
+      case ROLES.TEACHER:
+        return 'bg-green-100 text-green-800'
+      case ROLES.ACCOUNTS:
+        return 'bg-yellow-100 text-yellow-800'
+      case ROLES.STUDENT:
+        return 'bg-gray-100 text-gray-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
     }
-    return colors[role] || 'bg-gray-100 text-gray-800'
   }
 
   return (
@@ -235,7 +242,7 @@ function UsersManagement() {
             <div>
               <p className="text-sm text-gray-600">Admins</p>
               <p className="text-2xl font-bold text-gray-900">
-                {users.filter(u => u.role === 'admin').length}
+                {users.filter(u => u.role === ROLES.ADMIN).length}
               </p>
             </div>
             <UserCheck className="text-purple-600" size={32} />
@@ -246,7 +253,7 @@ function UsersManagement() {
             <div>
               <p className="text-sm text-gray-600">Teachers</p>
               <p className="text-2xl font-bold text-gray-900">
-                {users.filter(u => u.role === 'teacher' || u.role === 'head-teacher').length}
+                {users.filter(u => u.role === ROLES.TEACHER || u.role === ROLES.HEAD_TEACHER).length}
               </p>
             </div>
             <UserCheck className="text-green-600" size={32} />
@@ -257,7 +264,7 @@ function UsersManagement() {
             <div>
               <p className="text-sm text-gray-600">Students</p>
               <p className="text-2xl font-bold text-gray-900">
-                {users.filter(u => u.role === 'student').length}
+                {users.filter(u => u.role === ROLES.STUDENT).length}
               </p>
             </div>
             <UserCheck className="text-gray-600" size={32} />

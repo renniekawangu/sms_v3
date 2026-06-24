@@ -3,6 +3,7 @@ import { Users, Search, Edit2, Save, X } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { rolesApi } from '../services/rolesApi'
 import { studentsApi, teachersApi, accountsApi } from '../services/api'
+import { ROLES } from '../config/rbac'
 
 function UserRoleAssignment() {
   const [users, setUsers] = useState([])
@@ -44,25 +45,25 @@ function UserRoleAssignment() {
 
         const allUsers = [
           ...students.map((s) => ({
-            user_id: s.student_id,
-            name: s.name,
+            user_id: s.student_id || s._id,
+            name: s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim(),
             email: s.email,
             type: 'student',
-            currentRole: 'Teacher', // Would come from API
+            currentRole: s.role || s.currentRole || ROLES.STUDENT,
           })),
           ...teachers.map((t) => ({
-            user_id: t.teacher_id,
-            name: t.name,
+            user_id: t.teacher_id || t._id,
+            name: t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim(),
             email: t.email,
             type: 'teacher',
-            currentRole: 'Teacher',
+            currentRole: t.role || t.currentRole || ROLES.TEACHER,
           })),
           ...accounts.map((a) => ({
-            user_id: a.accountant_id,
-            name: a.name,
+            user_id: a.accountant_id || a._id,
+            name: a.name || `${a.firstName || ''} ${a.lastName || ''}`.trim(),
             email: a.email,
             type: 'accounts',
-            currentRole: 'Accountant',
+            currentRole: a.role || a.currentRole || ROLES.ACCOUNTS,
           })),
         ]
 
@@ -159,8 +160,11 @@ function UserRoleAssignment() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.user_id} className="border-b border-gray-100 hover:bg-gray-50">
+                filteredUsers.map((user, index) => (
+                  <tr
+                    key={user.user_id || `${user.email || user.name || 'user'}-${index}`}
+                    className="border-b border-gray-100 hover:bg-gray-50"
+                  >
                     <td className="py-4 px-6">
                       <div className="font-medium text-text-dark">{user.name}</div>
                     </td>
@@ -183,8 +187,11 @@ function UserRoleAssignment() {
                           className="px-3 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue"
                         >
                           <option value="">Select a role</option>
-                          {roles.map((role) => (
-                            <option key={role.role_id} value={role.role_id}>
+                          {roles.map((role, roleIndex) => (
+                            <option
+                              key={role.role_id || `${role.name}-${roleIndex}`}
+                              value={role.role_id}
+                            >
                               {role.name}
                             </option>
                           ))}

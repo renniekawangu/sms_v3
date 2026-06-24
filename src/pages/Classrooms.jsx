@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { School, Search, Plus, Edit, Trash2, AlertCircle, Eye } from 'lucide-react'
 import { classroomsApi, adminApi, timetableApi, teachersApi, teacherApi } from '../services/api'
+import { ROLES } from '../config/rbac'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
@@ -36,7 +37,7 @@ function Classrooms() {
       }
 
       // For teachers, fetch only their classrooms
-      if (user?.role === 'teacher') {
+      if (user?.role === ROLES.TEACHER) {
         const [classroomsData, studentsResp, coursesData] = await Promise.all([
           teacherApi.getMyClassrooms(),
           adminApi.listStudents({ limit: 1000 }),

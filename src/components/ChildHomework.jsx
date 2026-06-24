@@ -3,6 +3,7 @@ import { parentsApi, homeworkApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
+import { ROLES } from '../config/rbac'
 import { BookOpen, Calendar, User, Download, FileText } from 'lucide-react'
 import ErrorBoundary from '../components/ErrorBoundary'
 import HomeworkSubmission from './HomeworkSubmission'
@@ -18,9 +19,9 @@ function ChildHomework({ studentId }) {
   const [showingSubmissionId, setShowingSubmissionId] = useState(null)
   
   // Check user roles for submission access
-  const isStudent = user?.role === 'student' && user?.id === studentId
-  const isParent = user?.role === 'parent'
-  const isTeacher = user?.role === 'teacher'
+  const isStudent = user?.role === ROLES.STUDENT && user?.id === studentId
+  const isParent = user?.role === ROLES.PARENT
+  const isTeacher = user?.role === ROLES.TEACHER
   const canSubmit = isStudent || isParent || isTeacher
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { doc, collection, getDoc, getDocs, addDoc, setDoc, updateDoc as firestor
 import { signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth'
 import { jsPDF } from 'jspdf'
 import { auth, db } from './firebaseConfig'
+import { ROLES } from '../config/rbac'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
@@ -146,7 +147,7 @@ const getCurrentUserProfile = async () => {
     uid: firebaseUser.uid,
     email: firebaseUser.email,
     name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-    role: 'student',
+    role: ROLES.STUDENT,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   }
@@ -395,10 +396,10 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return results.filter((item) => item.name?.toLowerCase().includes(q) || item.email?.toLowerCase().includes(q))
     }
     if (first === 'staff-list' && method === 'GET') {
-      return listDocuments('users', { role: 'teacher' })
+      return listDocuments('users', { role: ROLES.TEACHER })
     }
     if (first === 'students-list' && method === 'GET') {
-      return listDocuments('users', { role: 'student' })
+      return listDocuments('users', { role: ROLES.STUDENT })
     }
   }
 
@@ -1314,6 +1315,11 @@ export const adminApi = {
 
 // Accounts API
 export const accountsApi = {
+  list: async () => {
+    // Return accountant users from the admin users collection using role filtering
+    return apiCall('/admin/users?role=accountant');
+  },
+
   getDashboard: async () => {
     return apiCall('/accounts/dashboard', {
       method: 'GET',

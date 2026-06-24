@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { ROLES } from '../config/permissions'
+import { ROLES } from '../config/rbac'
 
 function UserForm({ user, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({

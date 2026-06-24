@@ -34,7 +34,7 @@ function Staffs() {
     lastName: '',
     email: '',
     phone: '',
-    role: 'teacher',
+    role: ROLES.TEACHER,
     department: 'Administration'
   })
   const { success, error: showError } = useToast()
@@ -82,7 +82,7 @@ function Staffs() {
       lastName: '',
       email: '',
       phone: '',
-      role: 'teacher',
+      role: ROLES.TEACHER,
       department: 'Administration'
     })
     setIsModalOpen(true)

@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import RoleForm from '../components/RoleForm'
 import { useToast } from '../contexts/ToastContext'
 import { rolesApi } from '../services/rolesApi'
+import { PERMISSION_DESCRIPTIONS } from '../config/permissions'
 
 function RoleManagement() {
   const [roles, setRoles] = useState([])
@@ -26,7 +27,7 @@ function RoleManagement() {
       // Try to load from the API, fallback to mock data
       try {
         const data = await rolesApi.list()
-        const items = Array.isArray(data) ? data : (data.data || [])
+        const items = Array.isArray(data) ? data : (data.data || data.roles || [])
         setRoles(items)
       } catch (err) {
         console.warn('API not available, using mock data')
@@ -223,7 +224,7 @@ function RoleManagement() {
                         key={perm}
                         className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full"
                       >
-                        {perm.replace(/_/g, ' ')}
+                        {PERMISSION_DESCRIPTIONS[perm] || perm.replace(/_/g, ' ')}
                       </span>
                     ))}
                     {role.permissions?.length > 3 && (
@@ -313,11 +314,11 @@ function RoleManagement() {
             <div className="space-y-2">
               {viewDetailsRole?.permissions?.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {viewDetailsRole.permissions.map((perm) => (
-                    <span key={perm} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                      {perm.replace(/_/g, ' ')}
-                    </span>
-                  ))}
+                      {viewDetailsRole.permissions.map((perm) => (
+                        <span key={perm} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                          {PERMISSION_DESCRIPTIONS[perm] || perm.replace(/_/g, ' ')}
+                        </span>
+                      ))}
                 </div>
               ) : (
                 <p className="text-text-muted">No permissions assigned</p>
