@@ -5,8 +5,8 @@ function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="px-3 pb-4 pt-2 sm:px-4 lg:px-6">
-      <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(244,248,252,0.92))] shadow-[0_20px_55px_rgba(15,23,42,0.08)]">
+    <footer className="">
+      <div className="mx-auto max-w-[1440px] overflow-hidden border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(244,248,252,0.92))] shadow-[0_20px_55px_rgba(15,23,42,0.08)]">
         <div className="grid grid-cols-1 gap-4 px-4 py-6 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8 lg:py-8">
           {/* School Info */}
           <div className="space-y-3">

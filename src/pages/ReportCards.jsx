@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Download, FileText, GraduationCap, Calendar, AlertCircle, Loader, CheckCircle } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import PageHeader from '../components/PageHeader'
+import { apiCall, classroomsApi, studentsApi } from '../services/api'
 
 const ReportCards = () => {
   const { success, error } = useToast()
@@ -28,27 +29,12 @@ const ReportCards = () => {
   const loadInitialData = async () => {
     try {
       setLoading(true)
-      const token = JSON.parse(localStorage.getItem('user')).token
 
       // Load students and classrooms
-      const [studentsRes, classroomsRes] = await Promise.all([
-        fetch('/api/students', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        fetch('/api/classrooms', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+      const [studentsData, classroomsData] = await Promise.all([
+        studentsApi.list(),
+        classroomsApi.list()
       ])
-
-      if (!studentsRes.ok) {
-        throw new Error(`Failed to load students: ${studentsRes.status}`)
-      }
-      if (!classroomsRes.ok) {
-        throw new Error(`Failed to load classrooms: ${classroomsRes.status}`)
-      }
-
-      const studentsData = await studentsRes.json()
-      const classroomsData = await classroomsRes.json()
 
       console.log('[ReportCards] Students data:', studentsData)
       console.log('[ReportCards] Classrooms data:', classroomsData)
@@ -79,20 +65,13 @@ const ReportCards = () => {
 
   const loadAvailableTerms = async (studentId) => {
     try {
-      const token = JSON.parse(localStorage.getItem('user')).token
-      const response = await fetch(`/api/reports/terms/available?studentId=${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableTerms(data.terms || [])
-        
-        // Set default term if available
-        if (data.terms && data.terms.length > 0) {
-          setSelectedTerm(data.terms[0].term)
-          setSelectedAcademicYear(data.terms[0].academicYear)
-        }
+      const data = await apiCall(`/reports/terms/available?studentId=${studentId}`)
+      setAvailableTerms(data.terms || [])
+      
+      // Set default term if available
+      if (data.terms && data.terms.length > 0) {
+        setSelectedTerm(data.terms[0].term)
+        setSelectedAcademicYear(data.terms[0].academicYear)
       }
     } catch (err) {
       console.error('Error loading terms:', err)

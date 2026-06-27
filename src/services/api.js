@@ -1,7 +1,8 @@
+import { deleteApp, initializeApp } from 'firebase/app'
 import { doc, collection, getDoc, getDocs, addDoc, setDoc, updateDoc as firestoreUpdateDoc, deleteDoc as firestoreDeleteDoc, query as firestoreQuery, where as firestoreWhere, orderBy as firestoreOrderBy, limit as firestoreLimit, arrayUnion, arrayRemove, Timestamp } from 'firebase/firestore'
-import { signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth'
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth'
 import { jsPDF } from 'jspdf'
-import { auth, db } from './firebaseConfig'
+import { auth, db, firebaseConfig } from './firebaseConfig'
 import { ROLES } from '../config/rbac'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -117,6 +118,44 @@ const createDocument = async (collectionName, data, id) => {
   return { _id: ref.id, ...payload }
 }
 
+const createUserAccount = async (data) => {
+  const { password, ...profileData } = data || {}
+  const role = profileData.role || ROLES.STUDENT
+  const now = Timestamp.now()
+
+  if (password && profileData.email) {
+    const secondaryApp = initializeApp(firebaseConfig, `user-create-${Date.now()}`)
+    try {
+      const secondaryAuth = getAuth(secondaryApp)
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, profileData.email, password)
+      const uid = credential.user.uid
+      const payload = {
+        ...profileData,
+        uid,
+        user_id: uid,
+        role,
+        date_of_join: profileData.date_of_join || new Date().toISOString().split('T')[0],
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      await setDoc(doc(db, 'users', uid), payload, { merge: true })
+      await mirrorRoleProfile(uid, payload)
+      return { _id: uid, ...payload }
+    } finally {
+      await deleteApp(secondaryApp)
+    }
+  }
+
+  const createdUser = await createDocument('users', {
+    ...profileData,
+    role,
+    date_of_join: profileData.date_of_join || new Date().toISOString().split('T')[0],
+  })
+  await mirrorRoleProfile(createdUser._id, createdUser)
+  return createdUser
+}
+
 const updateDocument = async (collectionName, id, data) => {
   const ref = getDocRef(collectionName, id)
   await firestoreUpdateDoc(ref, {
@@ -129,6 +168,131 @@ const updateDocument = async (collectionName, id, data) => {
 const deleteDocument = async (collectionName, id) => {
   await firestoreDeleteDoc(getDocRef(collectionName, id))
   return { success: true, id }
+}
+
+const splitName = (name = '') => {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' ') || '',
+  }
+}
+
+const getProfileId = (user = {}) => user._id || user.uid || user.user_id
+const getDisplayName = (user = {}) => user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'User'
+
+const userProfileToStudent = (user = {}) => {
+  const id = getProfileId(user)
+  const nameParts = splitName(user.name)
+  const firstName = user.firstName || nameParts.firstName || user.email || 'Student'
+  const lastName = user.lastName || nameParts.lastName || ''
+
+  return {
+    _id: id,
+    userId: id,
+    student_id: user.student_id || user.studentId || id,
+    studentId: user.studentId || user.student_id || id,
+    firstName,
+    lastName,
+    name: user.name || [firstName, lastName].filter(Boolean).join(' '),
+    email: user.email || '',
+    phone: user.phone || '',
+    dob: user.dob || '2000-01-01',
+    sex: user.sex || user.gender || '',
+    address: user.address || '',
+    date_of_join: user.date_of_join || new Date().toISOString().split('T')[0],
+    parentId: user.parentId || '',
+    role: ROLES.STUDENT,
+  }
+}
+
+const userProfileToTeacher = (user = {}) => {
+  const id = getProfileId(user)
+  const nameParts = splitName(user.name)
+  const firstName = user.firstName || nameParts.firstName || user.email || 'Staff'
+  const lastName = user.lastName || nameParts.lastName || ''
+  const role = user.role === ROLES.HEAD_TEACHER ? ROLES.HEAD_TEACHER : ROLES.TEACHER
+
+  return {
+    _id: id,
+    userId: id,
+    teacher_id: user.teacher_id || user.teacherId || id,
+    teacherId: user.teacherId || user.teacher_id || id,
+    firstName,
+    lastName,
+    name: user.name || [firstName, lastName].filter(Boolean).join(' '),
+    email: user.email || '',
+    phone: user.phone || '',
+    dob: user.dob || '1980-01-01',
+    sex: user.sex || user.gender || '',
+    address: user.address || '',
+    date_of_join: user.date_of_join || new Date().toISOString().split('T')[0],
+    department: user.department || (role === ROLES.HEAD_TEACHER ? 'Administration' : 'Teaching'),
+    role,
+  }
+}
+
+const userProfileToParent = (user = {}) => {
+  const nameParts = splitName(user.name)
+  const id = getProfileId(user)
+  return {
+    _id: id,
+    userId: id,
+    firstName: user.firstName || nameParts.firstName || user.email || 'Parent',
+    lastName: user.lastName || nameParts.lastName || '',
+    name: getDisplayName(user),
+    email: user.email || '',
+    phone: user.phone || '',
+    relationship: user.relationship || 'Guardian',
+    address: user.address || '',
+    occupation: user.occupation || '',
+    students: user.students || [],
+    role: ROLES.PARENT,
+  }
+}
+
+const mirrorRoleProfile = async (id, user = {}) => {
+  if (user.role === ROLES.STUDENT) {
+    await setDoc(doc(db, 'students', id), userProfileToStudent({ ...user, _id: id }), { merge: true })
+  }
+
+  if (user.role === ROLES.TEACHER || user.role === ROLES.HEAD_TEACHER) {
+    await setDoc(doc(db, 'teachers', id), userProfileToTeacher({ ...user, _id: id }), { merge: true })
+  }
+
+  if (user.role === ROLES.PARENT) {
+    await setDoc(doc(db, 'parents', id), userProfileToParent({ ...user, _id: id }), { merge: true })
+  }
+}
+
+const mergeRoleProfiles = async (collectionName, roleList, mapper, queryParams = {}) => {
+  const [profileDocs, users] = await Promise.all([
+    listDocuments(collectionName, queryParams),
+    Promise.all(roleList.map((role) => listDocuments('users', { role }))).then((results) => results.flat()),
+  ])
+
+  const profilesById = new Map(profileDocs.map((profile) => [profile._id, profile]))
+
+  users.forEach((user) => {
+    const id = getProfileId(user)
+    if (!profilesById.has(id)) {
+      profilesById.set(id, mapper(user))
+    }
+  })
+
+  return Array.from(profilesById.values())
+}
+
+const listStudentProfiles = (queryParams = {}) => {
+  return mergeRoleProfiles('students', [ROLES.STUDENT], userProfileToStudent, queryParams)
+}
+
+const listTeacherProfiles = (queryParams = {}) => {
+  return mergeRoleProfiles('teachers', [ROLES.TEACHER, ROLES.HEAD_TEACHER], userProfileToTeacher, queryParams)
+}
+
+const listParentProfiles = async (queryParams = {}) => {
+  return mergeRoleProfiles('parents', [ROLES.PARENT], userProfileToParent, queryParams)
 }
 
 const getCurrentUserProfile = async () => {
@@ -228,6 +392,25 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   }
 
   const collectionName = getResourceName()
+
+  if (resource === 'users') {
+    if (method === 'POST' && segments.length === 1) {
+      return createUserAccount(body)
+    }
+
+    if ((method === 'PUT' || method === 'PATCH') && segments.length === 2) {
+      const { password, ...profileData } = body || {}
+      return updateDocument('users', first, profileData)
+    }
+  }
+
+  if (resource === 'students' && method === 'GET' && segments.length === 1) {
+    return listStudentProfiles(queryParams)
+  }
+
+  if (resource === 'teachers' && method === 'GET' && segments.length === 1) {
+    return listTeacherProfiles(queryParams)
+  }
 
   // Generic CRUD
   const isResultsPendingRoute = resource === 'results' && segments.length === 2 && first === 'pending' && method === 'GET'
@@ -519,7 +702,17 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       throw new Error('Authentication required for parent endpoints')
     }
     if (segments.length === 1 && method === 'GET') {
-      return listDocuments('parents', queryParams)
+      return listParentProfiles(queryParams)
+    }
+    if (segments.length === 2 && method === 'PUT') {
+      await setDoc(doc(db, 'parents', first), {
+        ...body,
+        updatedAt: Timestamp.now(),
+      }, { merge: true })
+      return getDocumentById('parents', first)
+    }
+    if (segments.length === 2 && method === 'DELETE') {
+      return deleteDocument('parents', first)
     }
     if (first === 'dashboard' && method === 'GET') {
       return { message: 'Parent dashboard is powered by Firestore collections.' }
@@ -557,12 +750,12 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     }
     if (second === 'link' && third && method === 'POST') {
       const parentRef = doc(db, 'parents', first)
-      await firestoreUpdateDoc(parentRef, { children: arrayUnion(third) })
+      await setDoc(parentRef, { students: arrayUnion(third), updatedAt: Timestamp.now() }, { merge: true })
       return { success: true, parentId: first, studentId: third }
     }
     if (second === 'unlink' && third && method === 'POST') {
       const parentRef = doc(db, 'parents', first)
-      await firestoreUpdateDoc(parentRef, { children: arrayRemove(third) })
+      await setDoc(parentRef, { students: arrayRemove(third), updatedAt: Timestamp.now() }, { merge: true })
       return { success: true, parentId: first, studentId: third }
     }
   }
@@ -636,6 +829,171 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     }
   }
 
+  // Messages endpoints
+  if (resource === 'messages') {
+    const getCurrentUserSummary = async () => {
+      const profile = await getCurrentUserProfile()
+      return normalizeUserSummary(profile)
+    }
+
+    const getUserById = async (id) => {
+      if (!id) return normalizeUserSummary({})
+      return getDocumentById('users', id)
+        .then(normalizeUserSummary)
+        .catch(() => normalizeUserSummary({ _id: id }))
+    }
+
+    const listNormalizedMessages = async () => {
+      const messages = await listDocuments('messages')
+      return messages
+        .map(normalizeMessage)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    }
+
+    if (first === 'inbox' && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const messages = await listNormalizedMessages()
+      return {
+        messages: messages.filter((message) => {
+          const recipientId = String(message.recipientId || message.recipient?.id || message.recipient?._id || '')
+          return recipientId === String(currentUser.id)
+        }),
+      }
+    }
+
+    if (first === 'sent' && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const messages = await listNormalizedMessages()
+      return {
+        messages: messages.filter((message) => {
+          const senderId = String(message.senderId || message.sender?.id || message.sender?._id || '')
+          return senderId === String(currentUser.id)
+        }),
+      }
+    }
+
+    if (first === 'unread' && second === 'count' && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const messages = await listNormalizedMessages()
+      const unreadCount = messages.filter((message) => {
+        const recipientId = String(message.recipientId || message.recipient?.id || message.recipient?._id || '')
+        return recipientId === String(currentUser.id) && !message.isRead
+      }).length
+      return { unreadCount }
+    }
+
+    if (first === 'conversation' && second && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const otherUserId = String(second)
+      const messages = await listNormalizedMessages()
+      return {
+        messages: messages.filter((message) => {
+          const senderId = String(message.senderId || message.sender?.id || message.sender?._id || '')
+          const recipientId = String(message.recipientId || message.recipient?.id || message.recipient?._id || '')
+          return (
+            (senderId === String(currentUser.id) && recipientId === otherUserId) ||
+            (senderId === otherUserId && recipientId === String(currentUser.id))
+          )
+        }),
+      }
+    }
+
+    if (first === 'send' && method === 'POST') {
+      const currentUser = await getCurrentUserSummary()
+      const recipient = await getUserById(body?.recipientId)
+      const message = await createDocument('messages', {
+        senderId: currentUser.id,
+        recipientId: recipient.id,
+        sender: currentUser,
+        recipient,
+        subject: body?.subject || 'Chat',
+        message: body?.message || '',
+        priority: body?.priority || 'normal',
+        category: body?.category || 'general',
+        isRead: false,
+      })
+      return { message: normalizeMessage(message), success: true }
+    }
+
+    if (first === 'contacts' && second === 'list' && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const users = await listDocuments('users')
+      return {
+        contacts: users
+          .map(normalizeUserSummary)
+          .filter((contact) => String(contact.id) !== String(currentUser.id)),
+      }
+    }
+
+    if (second === 'read' && method === 'PATCH') {
+      const message = await updateDocument('messages', first, { isRead: true, readAt: Timestamp.now() })
+      return { message: normalizeMessage(message), success: true }
+    }
+
+    if (first === 'search' && second && method === 'GET') {
+      const currentUser = await getCurrentUserSummary()
+      const messages = await listNormalizedMessages()
+      const searchTerm = String(second).toLowerCase()
+      return {
+        messages: messages.filter((message) => {
+          const senderId = String(message.senderId || message.sender?.id || message.sender?._id || '')
+          const recipientId = String(message.recipientId || message.recipient?.id || message.recipient?._id || '')
+          const isParticipant = senderId === String(currentUser.id) || recipientId === String(currentUser.id)
+          return isParticipant && String(message.message || '').toLowerCase().includes(searchTerm)
+        }),
+      }
+    }
+
+    if (first && method === 'DELETE') {
+      return deleteDocument('messages', first)
+    }
+  }
+
+  // Report option endpoints used by report screens in Firestore-backed local dev.
+  if (resource === 'reports') {
+    if (first === 'available' && method === 'GET') {
+      const [students, classrooms, subjects] = await Promise.all([
+        listDocuments('students'),
+        listDocuments('classrooms'),
+        listDocuments('subjects'),
+      ])
+
+      return {
+        parameters: {
+          students: students.map((student) => ({
+            id: student._id,
+            name: [student.firstName, student.lastName].filter(Boolean).join(' ') || student.name || student.email || student._id,
+          })),
+          classes: classrooms.map((classroom) => ({
+            id: classroom._id,
+            name: classroom.className || classroom.name || classroom._id,
+          })),
+          subjects: subjects.map((subject) => ({
+            id: subject._id,
+            name: subject.name || subject.subjectName || subject._id,
+          })),
+          reportTypes: ['attendance', 'grades', 'fees', 'analytics'],
+        },
+      }
+    }
+
+    if (first === 'terms' && second === 'available' && method === 'GET') {
+      const results = await listDocuments('results', { studentId: queryParams.studentId })
+      const terms = Array.from(
+        new Map(
+          results
+            .filter((result) => result.term && result.academicYear)
+            .map((result) => [`${result.term}-${result.academicYear}`, {
+              term: result.term,
+              academicYear: result.academicYear,
+            }])
+        ).values()
+      )
+
+      return { terms }
+    }
+  }
+
   // Messages, roles, receipts and other custom endpoints will still fall through to Firestore helper or error.
 
   throw new Error(`Unsupported Firestore endpoint: ${endpoint}`)
@@ -652,6 +1010,29 @@ const parseRequestBody = (body) => {
   }
   return body
 }
+
+const normalizeDateValue = (value) => {
+  if (!value) return new Date().toISOString()
+  if (typeof value.toDate === 'function') return value.toDate().toISOString()
+  if (value instanceof Date) return value.toISOString()
+  return value
+}
+
+const normalizeUserSummary = (user) => ({
+  id: user?._id || user?.id || user?.uid || '',
+  _id: user?._id || user?.id || user?.uid || '',
+  name: user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'User',
+  email: user?.email || '',
+  role: user?.role || '',
+})
+
+const normalizeMessage = (message) => ({
+  ...message,
+  sender: normalizeUserSummary(message.sender || { _id: message.senderId, name: message.senderName }),
+  recipient: normalizeUserSummary(message.recipient || { _id: message.recipientId, name: message.recipientName }),
+  createdAt: normalizeDateValue(message.createdAt),
+  updatedAt: normalizeDateValue(message.updatedAt || message.createdAt),
+})
 
 export const apiCall = async (endpoint, options = {}) => {
   const body = parseRequestBody(options.body)
@@ -1316,8 +1697,8 @@ export const adminApi = {
 // Accounts API
 export const accountsApi = {
   list: async () => {
-    // Return accountant users from the admin users collection using role filtering
-    return apiCall('/admin/users?role=accountant');
+    // Return accounts users from the admin users collection using role filtering
+    return apiCall(`/admin/users?role=${ROLES.ACCOUNTS}`);
   },
 
   getDashboard: async () => {

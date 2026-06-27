@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import Footer from '../components/Footer'
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -40,7 +41,8 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background-light flex flex-col items-center justify-center p-3 sm:p-4 lg:p-6 py-8 sm:py-10">
+    <>
+      <div className="min-h-screen bg-background-light flex flex-col items-center justify-center p-3 sm:p-4 lg:p-6 py-8 sm:py-10">
       <div className="w-full max-w-md flex-shrink-0">
         {/* Login Card */}
         <div className="bg-card-white rounded-custom shadow-custom p-4 sm:p-5 lg:p-8">
@@ -145,6 +147,8 @@ function Login() {
         </p>
       </div>
     </div>
+    <Footer />
+    </>
   )
 }
 

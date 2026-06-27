@@ -3,9 +3,7 @@ function PageHeader({ eyebrow, title, description, meta, actions }) {
     <section className="page-header">
       <div className="page-header-row">
         <div>
-          {eyebrow && <div className="page-eyebrow">{eyebrow}</div>}
           <h1 className="page-title">{title}</h1>
-          {description && <p className="page-description">{description}</p>}
         </div>
 
         {actions ? <div className="page-actions">{actions}</div> : null}

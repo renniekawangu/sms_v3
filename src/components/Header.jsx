@@ -1,4 +1,4 @@
-import { Search, ShieldCheck, LogOut, Menu } from 'lucide-react'
+import { Search, ShieldCheck, LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -16,8 +16,10 @@ function Header({ onMenuClick }) {
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const searchPanelRef = useRef(null)
   const mobileSearchPanelRef = useRef(null)
+  const mobileSearchInputRef = useRef(null)
   const debouncedQuery = useDebounce(searchQuery, 300)
 
   const handleLogout = async () => {
@@ -75,6 +77,7 @@ function Header({ onMenuClick }) {
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
         setShowResults(false)
+        setIsMobileSearchOpen(false)
       }
     }
 
@@ -86,6 +89,13 @@ function Header({ onMenuClick }) {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [])
+
+  useEffect(() => {
+    // Auto-focus the input when mobile search opens
+    if (isMobileSearchOpen && mobileSearchInputRef.current) {
+      mobileSearchInputRef.current.focus()
+    }
+  }, [isMobileSearchOpen])
 
   const handleSearchChange = (query) => {
     setSearchQuery(query)
@@ -99,6 +109,13 @@ function Header({ onMenuClick }) {
     navigate(`/search-results/${result._id}?type=${result.type}`)
     setSearchQuery('')
     setShowResults(false)
+    setIsMobileSearchOpen(false)
+  }
+
+  const closeMobileSearch = () => {
+    setIsMobileSearchOpen(false)
+    setShowResults(false)
+    setSearchQuery('')
   }
 
   const greetingName = user?.name?.split(' ')[0] || 'Team'
@@ -114,13 +131,7 @@ function Header({ onMenuClick }) {
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-3">
-            <button
-              onClick={onMenuClick}
-              className="md:hidden inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white/80 p-2.5 text-slate-700 shadow-sm transition hover:bg-white"
-              aria-label="Open menu"
-            >
-              <Menu size={20} />
-            </button>
+            
 
             <div className="hidden md:block w-full max-w-xl">
               {isAdmin && (
@@ -178,27 +189,53 @@ function Header({ onMenuClick }) {
                 </div>
               )}
             </div>
+    
+
+            {isAdmin && !isMobileSearchOpen && (
+              <button
+                onClick={() => setIsMobileSearchOpen(true)}
+                className="md:hidden p-2 text-slate-600 hover:text-slate-800 transition"
+                aria-label="Open search"
+              >
+                <Search size={20} />
+              </button>
+            )}
+            <button
+              onClick={onMenuClick}
+              className="md:hidden inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white/80 p-2.5 text-slate-700 shadow-sm transition hover:bg-white"
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
           </div>
         </div>
 
-        {isAdmin && (
+        {isAdmin && isMobileSearchOpen && (
           <div className="mt-3 md:hidden" ref={mobileSearchPanelRef}>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="relative flex items-center gap-2">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
               <input
+                ref={mobileSearchInputRef}
                 type="text"
                 placeholder="Search students, staff, and users..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={() => searchQuery && setShowResults(true)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-primary-blue focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-3 pl-11 pr-11 text-sm text-slate-700 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-primary-blue focus:bg-white focus:ring-4 focus:ring-cyan-100"
                 aria-label="Search users"
                 aria-expanded={showResults}
                 aria-controls="header-search-results-mobile"
               />
+              <button
+                onClick={closeMobileSearch}
+                className="absolute right-3 p-1 text-slate-600 hover:text-slate-800 transition"
+                aria-label="Close search"
+              >
+                <X size={18} />
+              </button>
 
               {showResults && searchResults.length > 0 && (
-                <div id="header-search-results-mobile" role="listbox" className="absolute top-full left-0 right-0 mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
+                <div id="header-search-results-mobile" role="listbox" className="absolute top-full left-0 right-0 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
                   {searchResults.map((result, index) => (
                     <button
                       key={index}
@@ -224,13 +261,13 @@ function Header({ onMenuClick }) {
               )}
 
               {showResults && searchQuery && searchResults.length === 0 && !isSearching && (
-                <div className="absolute top-full left-0 right-0 mt-3 rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
                   No matching users found
                 </div>
               )}
 
               {isSearching && (
-                <div className="absolute top-full left-0 right-0 mt-3 rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500 shadow-[0_28px_48px_rgba(15,23,42,0.14)] z-50">
                   Searching records...
                 </div>
               )}

@@ -65,7 +65,6 @@ function AdminDashboard() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Control Center"
         title="Admin Dashboard"
       />
 

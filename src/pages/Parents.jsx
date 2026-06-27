@@ -150,6 +150,11 @@ function Parents() {
     return students.filter(s => !linkedIds.includes(s._id))
   }
 
+  const getLinkedStudent = (studentRef) => {
+    if (typeof studentRef === 'object' && studentRef !== null) return studentRef
+    return students.find(student => student._id === studentRef) || { _id: studentRef, firstName: 'Unknown', lastName: 'Student' }
+  }
+
   if (loading) {
     return <div className="text-center py-12">Loading...</div>
   }
@@ -315,7 +320,9 @@ function Parents() {
                   </h4>
                   {(parent.students || []).length > 0 ? (
                     <div className="space-y-2">
-                      {parent.students.map(student => (
+                      {parent.students.map(studentRef => {
+                        const student = getLinkedStudent(studentRef)
+                        return (
                         <div
                           key={student._id}
                           className="flex items-center justify-between bg-white p-2 rounded border border-gray-200"
@@ -334,7 +341,7 @@ function Parents() {
                             <Unlink size={16} />
                           </button>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   ) : (
                     <p className="text-sm text-text-muted italic">No students linked yet</p>

@@ -15,8 +15,8 @@ import { ROLES, ROUTE_ACCESS } from '../config/rbac'
 const allMenuItems = {
   dashboard: { label: 'Dashboard', icon: Grid, path: '/', roles: [ROLES.ADMIN, ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.STUDENT, ROLES.ACCOUNTS, ROLES.PARENT] },
   adminPanel: { label: 'Admin Panel', icon: Lock, path: '/admin', roles: [ROLES.ADMIN] },
-  roles: { label: 'Users & Roles', icon: Users, path: '/roles', roles: [ROLES.ADMIN] },
-  users: { label: 'Users', icon: UserCog, path: '/users', roles: [ROLES.ADMIN] },
+  roles: { label: 'Roles & Permissions', icon: Users, path: '/roles', roles: [ROLES.ADMIN] },
+  users: { label: 'User Accounts', icon: UserCog, path: '/users', roles: [ROLES.ADMIN] },
   students: { label: 'Students', icon: GraduationCap, path: '/students', roles: [ROLES.ADMIN] },
   parents: { label: 'Parents', icon: Users, path: '/parents', roles: [ROLES.ADMIN] },
   teachers: { label: 'Teachers', icon: User, path: '/teachers', roles: [ROLES.ADMIN] },

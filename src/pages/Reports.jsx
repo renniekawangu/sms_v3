@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Download, FileText, BarChart3, Calendar, User, BookOpen, DollarSign } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
+import { apiCall } from '../services/api'
 
 const Reports = () => {
   const { success, error } = useToast()
@@ -30,12 +31,7 @@ const Reports = () => {
   const loadReportParameters = async () => {
     try {
       setLoading(true)
-      const token = JSON.parse(localStorage.getItem('user')).token
-      const response = await fetch('/api/reports/available', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error('Failed to load report parameters')
-      const data = await response.json()
+      const data = await apiCall('/reports/available')
       setReportParams(data.parameters)
     } catch (err) {
       console.error('Error loading parameters:', err)
