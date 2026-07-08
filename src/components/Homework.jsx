@@ -3,6 +3,7 @@ import { homeworkApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
+import { ROLES } from '../config/rbac'
 import { BookOpen, Plus, Trash2, Edit, Calendar, User, CheckCircle, Upload, X } from 'lucide-react'
 import Modal from '../components/Modal'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -207,7 +208,7 @@ function Homework({ classroomId }) {
     setIsModalOpen(false)
   }, [])
 
-  const isTeacher = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'head-teacher'
+  const isTeacher = user?.role === ROLES.TEACHER || user?.role === ROLES.ADMIN || user?.role === ROLES.HEAD_TEACHER
 
   if (loading) {
     return (

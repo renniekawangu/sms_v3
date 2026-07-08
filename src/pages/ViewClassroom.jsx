@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, School, Users, User, AlertCircle, Mail, Calendar, Clock } from 'lucide-react';
 import Homework from '../components/Homework';
 import ClassroomHomeworkList from '../components/ClassroomHomeworkList';
+import { ROLES } from '../config/rbac'
 
 function ViewClassroom() {
   const { id } = useParams();
@@ -198,12 +199,12 @@ function ViewClassroom() {
         {/* Homework Section */}
         <div className="mb-6">
           {/* Teacher View: Add Homework */}
-          {user?.role === 'teacher' && (
+          {user?.role === ROLES.TEACHER && (
             <Homework classroomId={id} />
           )}
           
           {/* Student/Parent View: Homework Submission */}
-          {(user?.role === 'student' || user?.role === 'parent') && (
+          {(user?.role === ROLES.STUDENT || user?.role === ROLES.PARENT) && (
             <div className="bg-card-white rounded-lg shadow-custom p-3 sm:p-4 lg:p-6">
               <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-text-dark mb-3 sm:mb-4 flex items-center gap-2">
                 <School size={18} className="text-primary-blue sm:size-5" />

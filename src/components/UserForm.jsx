@@ -124,7 +124,7 @@ function UserForm({ user, onSubmit, onCancel }) {
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-transparent ${
                 errors.email ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="user@example.com"
+              placeholder="name@esyncsms.com"
             />
             {errors.email && (
               <p className="mt-1 text-sm text-red-500">{errors.email}</p>

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { BookOpen, Calendar, User, Download, FileText } from 'lucide-react'
 import ErrorBoundary from './ErrorBoundary'
 import HomeworkSubmission from './HomeworkSubmission'
+import { ROLES } from '../config/rbac'
 
 function ClassroomHomeworkList({ classroomId }) {
   const { user } = useAuth()
@@ -16,9 +17,9 @@ function ClassroomHomeworkList({ classroomId }) {
   const [showingSubmissionId, setShowingSubmissionId] = useState(null)
   
   // Check user roles for submission access
-  const isStudent = user?.role === 'student'
-  const isParent = user?.role === 'parent'
-  const isTeacher = user?.role === 'teacher'
+  const isStudent = user?.role === ROLES.STUDENT
+  const isParent = user?.role === ROLES.PARENT
+  const isTeacher = user?.role === ROLES.TEACHER
 
   console.log('ClassroomHomeworkList - User:', { user, isStudent, isParent, isTeacher })
 

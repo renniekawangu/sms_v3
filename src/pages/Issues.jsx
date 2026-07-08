@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import IssueForm from '../components/IssueForm'
+import { ROLES } from '../config/rbac' 
 
 function Issues() {
   const { user } = useAuth()
@@ -228,7 +229,7 @@ function Issues() {
                           <Eye size={16} />
                           View
                         </button>
-                        {(user?.role === 'admin' || user?._id === issue.reportedBy?._id) && (
+                        {(user?.role === ROLES.ADMIN || user?._id === issue.reportedBy?._id) && (
                           <button
                             onClick={() => handleEdit(issue)}
                             className="text-primary-blue hover:text-primary-blue/80 text-sm font-medium flex items-center gap-1"
@@ -237,7 +238,7 @@ function Issues() {
                             Edit
                           </button>
                         )}
-                        {user?.role === 'admin' && issue.status !== 'resolved' && (
+                        {user?.role === ROLES.ADMIN && issue.status !== 'resolved' && (
                           <button
                             onClick={() => handleResolve(issue._id)}
                             className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center gap-1"
@@ -246,7 +247,7 @@ function Issues() {
                             Resolve
                           </button>
                         )}
-                        {(user?.role === 'admin' || user?._id === issue.reportedBy?._id) && (
+                        {(user?.role === ROLES.ADMIN || user?._id === issue.reportedBy?._id) && (
                           <button
                             onClick={() => handleDelete(issue._id)}
                             className="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1"

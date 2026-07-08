@@ -203,13 +203,13 @@ function Classrooms() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-text-dark">
-            {user?.role === 'teacher' ? 'My Classrooms' : 'Classrooms'}
+            {user?.role === ROLES.TEACHER ? 'My Classrooms' : 'Classrooms'}
           </h1>
           <p className="text-sm sm:text-base text-text-muted mt-1">
-            {user?.role === 'teacher' ? 'View your assigned classrooms' : 'Manage all classrooms'}
+            {user?.role === ROLES.TEACHER ? 'View your assigned classrooms' : 'Manage all classrooms'}
           </p>
         </div>
-        {user?.role !== 'teacher' && (
+        {user?.role !== ROLES.TEACHER && (
           <button
             onClick={handleCreate}
             className="flex items-center justify-center sm:justify-start gap-2 bg-primary-blue text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-primary-blue/90 transition-colors text-sm sm:text-base font-medium"
@@ -257,7 +257,7 @@ function Classrooms() {
                     >
                       <Eye size={16} />
                     </button>
-                    {user?.role !== 'teacher' && (
+                    {user?.role !== ROLES.TEACHER && (
                       <>
                         <button
                           onClick={() => handleEdit(classroom)}

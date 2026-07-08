@@ -3,6 +3,7 @@ import { CheckCircle, Search, AlertCircle, Users, Calendar, Download } from 'luc
 import { attendanceApi, classroomsApi, teacherApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { ROLES } from '../config/rbac'
 
 function Attendance() {
   const { user } = useAuth()
@@ -425,7 +426,7 @@ function Attendance() {
         </div>
 
         {/* Submit Button - Show only if there are pending changes */}
-        {Object.values(studentStatuses).some(s => s !== null) && user?.role !== 'student' && (
+        {Object.values(studentStatuses).some(s => s !== null) && user?.role !== ROLES.STUDENT && (
           <div className="mt-3 sm:mt-4 lg:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 sticky bottom-0 bg-white p-2 sm:p-3 lg:p-4 border-t border-gray-200 rounded-b-lg">
             <button
               onClick={handleMarkAttendanceSubmit}

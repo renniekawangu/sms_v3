@@ -341,7 +341,7 @@ function Results() {
                 </button>
               )}
               {/* Approve All button for submitted results */}
-              {(user.role === 'head-teacher' || user.role === 'admin') && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'submitted') && (
+              {(user.role === ROLES.HEAD_TEACHER || user.role === ROLES.ADMIN) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'submitted') && (
                 <button
                   onClick={() => handleBulkAction('bulkApprove')}
                   disabled={bulkProcessing}
@@ -352,7 +352,7 @@ function Results() {
                 </button>
               )}
               {/* Publish All button for approved results */}
-              {(user.role === 'admin' || user.role === 'head-teacher') && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'approved') && (
+              {(user.role === ROLES.ADMIN || user.role === ROLES.HEAD_TEACHER) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'approved') && (
                 <button
                   onClick={() => handleBulkAction('bulkPublish')}
                   disabled={bulkProcessing}
@@ -457,7 +457,7 @@ function Results() {
                           Submit
                         </button>
                       )}
-                      {result.status === 'submitted' && (user.role === 'head-teacher' || user.role === 'admin') && (
+                      {result.status === 'submitted' && (user.role === ROLES.HEAD_TEACHER || user.role === ROLES.ADMIN) && (
                         <button
                           onClick={() => handleStatusTransition(result._id, 'submitted')}
                           disabled={transitioningId === result._id}
@@ -467,7 +467,7 @@ function Results() {
                           Approve
                         </button>
                       )}
-                      {result.status === 'approved' && (user.role === 'admin' || user.role === 'head-teacher') && (
+                      {result.status === 'approved' && (user.role === ROLES.ADMIN || user.role === ROLES.HEAD_TEACHER) && (
                         <button
                           onClick={() => handleStatusTransition(result._id, 'approved')}
                           disabled={transitioningId === result._id}
