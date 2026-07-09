@@ -1820,9 +1820,24 @@ export const accountsApi = {
 
   getPayments: async (filters = {}) => {
     const params = filters instanceof URLSearchParams ? filters : new URLSearchParams(filters);
-    return apiCall(`/accounts/payments?${params}`, {
+    const result = await apiCall(`/accounts/payments?${params}`, {
       method: 'GET',
     });
+
+    if (Array.isArray(result)) {
+      return {
+        payments: result,
+        summary: {},
+        pagination: {
+          total: result.length,
+          pages: 1,
+          page: Number(params.get('page')) || 1,
+          limit: Number(params.get('limit')) || result.length,
+        },
+      };
+    }
+
+    return result;
   },
 
   createPayment: async (data) => {

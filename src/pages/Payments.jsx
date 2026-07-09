@@ -47,11 +47,14 @@ function Payments() {
         accountsApi.getPayments(queryParams),
         accountsApi.getFees()
       ])
-      setPayments(paymentsData.payments || [])
-      setSummary(paymentsData.summary || {})
-      setPagination(paymentsData.pagination || { total: 0, pages: 1, page: 1, limit: 50 })
-      const feesArray = Array.isArray(feesData) 
-        ? feesData 
+      const paymentsArray = Array.isArray(paymentsData) ? paymentsData : (paymentsData.payments || [])
+      setPayments(paymentsArray)
+      setSummary(Array.isArray(paymentsData) ? {} : (paymentsData.summary || {}))
+      setPagination(Array.isArray(paymentsData)
+        ? { total: paymentsArray.length, pages: 1, page: Number(queryParams.get('page')) || 1, limit: Number(queryParams.get('limit')) || paymentsArray.length }
+        : (paymentsData.pagination || { total: 0, pages: 1, page: 1, limit: 50 }))
+      const feesArray = Array.isArray(feesData)
+        ? feesData
         : (feesData?.fees || feesData?.data || [])
       setFees(feesArray)
     } catch (err) {
