@@ -77,7 +77,7 @@ const buildQuery = (collectionName, params = {}) => {
   }
 
   Object.entries(params).forEach(([key, value]) => {
-    if (['orderBy', 'order', 'limit', 'q'].includes(key)) return
+    if (['orderBy', 'order', 'limit', 'page', 'q'].includes(key)) return
     if (value === undefined || value === null || value === '') return
     clauses.push(firestoreWhere(key, '==', parseValue(value)))
   })
