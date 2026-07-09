@@ -101,15 +101,29 @@ function Payments() {
 
   const getFeeInfo = (feeId) => {
     if (!Array.isArray(fees)) return null
-    return fees.find(f => f._id === feeId || f.id === feeId)
+    return fees.find((f) => {
+      const id = f._id || f.id
+      return String(id) === String(feeId)
+    })
   }
 
-  const getStudentName = (feeId) => {
-    const fee = getFeeInfo(feeId)
-    if (fee?.studentId?.firstName && fee?.studentId?.lastName) {
-      return `${fee.studentId.firstName} ${fee.studentId.lastName}`
+  const getStudentName = (feeOrId) => {
+    if (!feeOrId) return 'Unknown'
+    const fee = typeof feeOrId === 'string' || typeof feeOrId === 'number'
+      ? getFeeInfo(feeOrId)
+      : feeOrId
+
+    if (!fee) return 'Unknown'
+
+    if (fee.student?.firstName || fee.student?.lastName) {
+      return [fee.student?.firstName, fee.student?.lastName].filter(Boolean).join(' ')
     }
-    return fee?.studentId?.name || 'Unknown'
+
+    if (fee.studentId?.firstName || fee.studentId?.lastName) {
+      return [fee.studentId?.firstName, fee.studentId?.lastName].filter(Boolean).join(' ')
+    }
+
+    return fee.student?.name || fee.studentId?.name || fee.studentId || fee.studentName || 'Unknown'
   }
 
   const filteredPayments = useMemo(() => {
@@ -306,19 +320,20 @@ function Payments() {
                 </thead>
                 <tbody>
                   {filteredPayments.map((payment) => {
-                    const fee = getFeeInfo(payment.feeId)
-                    const studentName = getStudentName(payment.feeId)
+                    const fee = getFeeInfo(payment.feeId || payment.fee_id)
+                    const studentName = payment.student?.name || payment.studentName || getStudentName(payment.feeId || payment.fee_id)
+                    const paymentAmount = payment.amount || payment.amountPaid || payment.paidAmount || 0
                     return (
-                      <tr key={payment._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <tr key={payment._id || payment.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="py-3 px-3 sm:px-4 text-text-dark">
                           {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString() : '-'}
                         </td>
-                        <td className="py-3 px-3 sm:px-4 text-text-dark font-medium">{studentName}</td>
-                        <td className="py-3 px-3 sm:px-4 text-text-dark text-sm">{fee?.description || '-'}</td>
-                        <td className="py-3 px-3 sm:px-4 text-text-dark font-semibold">K{payment.amountPaid?.toFixed(2)}</td>
-                        <td className="py-3 px-3 sm:px-4 text-text-muted capitalize">{payment.method}</td>
+                        <td className="py-3 px-3 sm:px-4 text-text-dark font-medium">{studentName || 'Unknown'}</td>
+                        <td className="py-3 px-3 sm:px-4 text-text-dark text-sm">{fee?.description || payment.description || '-'}</td>
+                        <td className="py-3 px-3 sm:px-4 text-text-dark font-semibold">K{Number(paymentAmount).toFixed(2)}</td>
+                        <td className="py-3 px-3 sm:px-4 text-text-muted capitalize">{payment.method || payment.paymentMethod || 'Unknown'}</td>
                         <td className="py-3 px-3 sm:px-4">
-                          {fee?.status === 'paid' ? (
+                          {(fee?.status === 'paid' || payment.status === 'paid') ? (
                             <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Paid</span>
                           ) : (
                             <span className="inline-block px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
