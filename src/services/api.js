@@ -1338,7 +1338,8 @@ export const timetableApi = {
 
     getByClassroom: async (classroom_id, params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return apiCall(`/timetable/schedules/classroom/${classroom_id}${query ? `?${query}` : ''}`);
+      const data = await apiCall(`/timetable/schedules/classroom/${classroom_id}${query ? `?${query}` : ''}`);
+      return Array.isArray(data) ? data[0] || null : data;
     },
 
     getByInstructor: async (instructor_id, params = {}) => {
@@ -1415,7 +1416,8 @@ export const timetableApi = {
 
     getByClassroom: async (classroom_id, params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return apiCall(`/timetable/courses/classroom/${classroom_id}${query ? `?${query}` : ''}`);
+      const data = await apiCall(`/timetable/courses/classroom/${classroom_id}${query ? `?${query}` : ''}`);
+      return Array.isArray(data) ? data[0] || null : data;
     },
 
     create: async (data) => {
@@ -1445,7 +1447,8 @@ export const timetableApi = {
   },
 
   getByClassroom: async (classroom_id) => {
-    return apiCall(`/timetable/schedules/classroom/${classroom_id}`);
+    const data = await apiCall(`/timetable/schedules/classroom/${classroom_id}`);
+    return Array.isArray(data) ? data[0] || null : data;
   },
 
   create: async (data) => {

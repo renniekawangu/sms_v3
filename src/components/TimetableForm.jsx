@@ -10,6 +10,22 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
   })
   const [errors, setErrors] = useState({})
 
+  const getStartTime = (timeValue) => {
+    if (!timeValue) return ''
+    const [start] = timeValue.split('-').map((t) => t.trim())
+    return start || ''
+  }
+
+  const addMinutes = (hhmm, minutes) => {
+    if (!hhmm) return ''
+    const [hh, mm] = hhmm.split(':').map(Number)
+    const d = new Date(1970, 0, 1, hh, mm)
+    d.setMinutes(d.getMinutes() + minutes)
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    return `${h}:${m}`
+  }
+
   useEffect(() => {
     if (timetable) {
       // Editing existing entry
@@ -17,7 +33,7 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
         classroom_id: timetable.classroom_id || timetable.classroom?._id || '',
         teacher_id: timetable.teacher_id || timetable.teacher?._id || '',
         day: timetable.day || timetable.dayOfWeek || 'Monday',
-        time: timetable.time || timetable.startTime || '',
+        time: getStartTime(timetable.time || timetable.startTime || ''),
         subject: (timetable.subject && typeof timetable.subject === 'object')
           ? (timetable.subject.name || '')
           : (timetable.subjectName || timetable.subject || ''),
@@ -99,6 +115,8 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
     '14:00', '14:30', '15:00', '15:30', '16:00'
   ]
 
+  const formatTimeLabel = (time) => `${time} - ${addMinutes(time, 60)}`
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -178,7 +196,7 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
 
         <div>
           <label htmlFor="time" className="block text-sm font-medium text-text-dark mb-2">
-            Time <span className="text-red-500">*</span>
+            Time (start - end) <span className="text-red-500">*</span>
           </label>
           <select
             id="time"
@@ -194,7 +212,7 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
             <option value="">Select time</option>
             {timeSlots.map((time) => (
               <option key={time} value={time}>
-                {time}
+                {formatTimeLabel(time)}
               </option>
             ))}
           </select>
@@ -232,6 +250,7 @@ function TimetableForm({ timetable, classrooms, subjects, teachers, selectedClas
                   className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-text-dark"
                 >
                   {subject.name}
+                  {subject.code ? ` (${subject.code})` : ''}
                 </button>
               ))}
             </div>
