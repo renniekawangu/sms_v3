@@ -414,7 +414,7 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
 
   // Generic CRUD
   const isResultsPendingRoute = resource === 'results' && segments.length === 2 && first === 'pending' && method === 'GET'
-  const isFirestoreCrudResource = resource !== 'settings' && resource !== 'admin' && resource !== 'timetable' && ['students', 'teachers', 'classrooms', 'subjects', 'exams', 'fees', 'payments', 'expenses', 'issues', 'users', 'roles', 'academicYears', 'feeStructures', 'holidays', 'timetableSchedules', 'timetableInstructors', 'timetableCourses', 'results', 'homework', 'attendance'].includes(collectionName) && !isResultsPendingRoute
+  const isFirestoreCrudResource = resource !== 'settings' && resource !== 'admin' && resource !== 'timetable' && resource !== 'accounts' && ['students', 'teachers', 'classrooms', 'subjects', 'exams', 'fees', 'payments', 'expenses', 'issues', 'users', 'roles', 'academicYears', 'feeStructures', 'holidays', 'timetableSchedules', 'timetableInstructors', 'timetableCourses', 'results', 'homework', 'attendance'].includes(collectionName) && !isResultsPendingRoute
 
   if (isFirestoreCrudResource) {
     if (method === 'GET' && segments.length === 1) {
