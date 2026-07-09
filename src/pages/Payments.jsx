@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CreditCard, Plus, AlertCircle, Search, RefreshCw, Filter, Calendar } from 'lucide-react'
-import { accountsApi } from '../services/api'
+import { accountsApi, studentsApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import PaymentForm from '../components/PaymentForm'
@@ -9,6 +9,7 @@ import PageHeader from '../components/PageHeader'
 function Payments() {
   const [payments, setPayments] = useState([])
   const [fees, setFees] = useState([])
+  const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -43,9 +44,10 @@ function Payments() {
       if (filters.endDate) queryParams.append('endDate', filters.endDate)
       if (filters.studentId) queryParams.append('studentId', filters.studentId)
 
-      const [paymentsData, feesData] = await Promise.all([
+      const [paymentsData, feesData, studentsData] = await Promise.all([
         accountsApi.getPayments(queryParams),
-        accountsApi.getFees()
+        accountsApi.getFees(),
+        studentsApi.list()
       ])
       const paymentsArray = Array.isArray(paymentsData) ? paymentsData : (paymentsData.payments || [])
       setPayments(paymentsArray)
@@ -57,6 +59,7 @@ function Payments() {
         ? feesData
         : (feesData?.fees || feesData?.data || [])
       setFees(feesArray)
+      setStudents(Array.isArray(studentsData) ? studentsData : (studentsData?.students || []))
     } catch (err) {
       const errorMessage = err.message || 'Failed to load data'
       setError(errorMessage)
@@ -102,50 +105,48 @@ function Payments() {
   const getFeeInfo = (feeId) => {
     if (!Array.isArray(fees)) return null
     return fees.find((f) => {
-      const id = f._id || f.id
+      const id = f._id || f.id || f.fee_id
       return String(id) === String(feeId)
     })
   }
 
-  const getStudentName = (feeOrPayment) => {
-    if (!feeOrPayment) return 'Unknown'
+  const resolveStudentName = (student) => {
+    if (!student) return null
+    if (typeof student === 'string') return student
+    if (student.name) return student.name
+    const firstName = student.firstName || student.first_name
+    const lastName = student.lastName || student.last_name
+    if (firstName || lastName) return [firstName, lastName].filter(Boolean).join(' ')
+    return student.student_id || student.studentId || student._id || null
+  }
 
-    const payment = (feeOrPayment && feeOrPayment.student) || feeOrPayment.paymentDate || feeOrPayment.amount || feeOrPayment.method
-      ? feeOrPayment
-      : null
-
-    if (payment) {
-      const student = payment.student || payment.studentId || payment.studentName
-      if (student?.firstName || student?.lastName) {
-        return [student?.firstName, student?.lastName].filter(Boolean).join(' ')
-      }
-      if (typeof student === 'string') {
-        return student
-      }
-      if (student?.name) {
-        return student.name
-      }
-      if (payment.studentName) {
-        return payment.studentName
-      }
+  const getStudentRecord = (studentIdentifier) => {
+    if (!studentIdentifier) return null
+    if (typeof studentIdentifier === 'string' || typeof studentIdentifier === 'number') {
+      return students.find((student) =>
+        String(student._id) === String(studentIdentifier) ||
+        String(student.student_id) === String(studentIdentifier) ||
+        String(student.studentId) === String(studentIdentifier)
+      ) || null
     }
+    return studentIdentifier
+  }
 
-    const feeId = typeof feeOrPayment === 'string' || typeof feeOrPayment === 'number'
-      ? feeOrPayment
-      : feeOrPayment.feeId || feeOrPayment.fee_id
+  const getStudentName = (payment) => {
+    if (!payment) return 'Unknown'
 
+    const directStudent = payment.student || payment.studentId || payment.student_id
+    const directRecord = getStudentRecord(directStudent)
+    const directName = resolveStudentName(directRecord || payment.studentName || directStudent)
+    if (directName) return directName
+
+    const feeId = payment.feeId || payment.fee_id || payment.fee_id
     const fee = getFeeInfo(feeId)
     if (!fee) return 'Unknown'
 
-    if (fee.student?.firstName || fee.student?.lastName) {
-      return [fee.student?.firstName, fee.student?.lastName].filter(Boolean).join(' ')
-    }
-
-    if (fee.studentId?.firstName || fee.studentId?.lastName) {
-      return [fee.studentId?.firstName, fee.studentId?.lastName].filter(Boolean).join(' ')
-    }
-
-    return fee.student?.name || fee.studentId?.name || fee.studentId || fee.studentName || 'Unknown'
+    const feeStudent = fee.student || fee.studentId || fee.student_id
+    const feeRecord = getStudentRecord(feeStudent)
+    return resolveStudentName(feeRecord || fee.studentName || feeStudent) || 'Unknown'
   }
 
   const filteredPayments = useMemo(() => {
@@ -164,7 +165,7 @@ function Payments() {
         getStudentName(payment).toLowerCase().includes(query)
       )
     })
-  }, [payments, fees, searchQuery])
+  }, [payments, fees, students, searchQuery])
 
   if (loading) {
     return (
@@ -347,7 +348,7 @@ function Payments() {
                 <tbody>
                   {filteredPayments.map((payment) => {
                     const fee = getFeeInfo(payment.feeId || payment.fee_id)
-                    const studentName = payment.student?.name || payment.studentName || getStudentName(payment.feeId || payment.fee_id)
+                    const studentName = getStudentName(payment)
                     const paymentAmount = payment.amount || payment.amountPaid || payment.paidAmount || 0
                     return (
                       <tr key={payment._id || payment.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
