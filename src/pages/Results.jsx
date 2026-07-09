@@ -66,7 +66,7 @@ function Results() {
   const handleLoadResults = async () => {
     if (!selectedClassroom || !selectedExam) {
       showError('Please select both classroom and exam')
-      return
+      return []
     }
 
     try {
@@ -90,13 +90,24 @@ function Results() {
 
         setResults(initializedResults)
         showSuccess('Results initialized for all students')
+        return initializedResults
       } else {
         setResults(resultsData)
+        return resultsData
       }
     } catch (err) {
       showError(err.message || 'Failed to load results')
+      return []
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleOpenGradeForm = async () => {
+    const loadedResults = results.length === 0 ? await handleLoadResults() : results
+
+    if (loadedResults.length > 0) {
+      setShowGradeForm(true)
     }
   }
 
@@ -284,7 +295,7 @@ function Results() {
           <div className="flex flex-col gap-4">
             <div className="flex gap-2">
               <button
-                onClick={() => setShowGradeForm(true)}
+                onClick={handleOpenGradeForm}
                 className="btn-ui btn-primary"
               >
                 <Upload size={18} />
