@@ -797,20 +797,6 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   if (resource === 'results') {
     if (segments.length === 1 && method === 'POST') return createDocument('results', body)
     if (segments.length === 1 && method === 'GET') return listDocuments('results', queryParams)
-    if (segments.length === 2) {
-      if (method === 'GET') return getDocumentById('results', first)
-      if (method === 'PUT') return updateDocument('results', first, body)
-      if (method === 'DELETE') return deleteDocument('results', first)
-    }
-    if (segments.length === 3 && first === 'classroom' && method === 'GET') {
-      return listDocuments('results', { classroomId: second, examId: queryParams.examId })
-    }
-    if (segments.length === 3 && first === 'student' && method === 'GET') {
-      return listDocuments('results', { studentId: second, ...queryParams })
-    }
-    if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
-      return listDocuments('results', { classroomId: second, examId: fourth })
-    }
     if (segments.length === 2 && first === 'initialize' && method === 'POST') {
       if (!body?.exam || !body?.classroom) {
         throw new Error('Exam and classroom are required to initialize results')
@@ -881,6 +867,20 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
         createdResults.push(await createDocument('results', item))
       }
       return createdResults
+    }
+    if (segments.length === 2) {
+      if (method === 'GET') return getDocumentById('results', first)
+      if (method === 'PUT') return updateDocument('results', first, body)
+      if (method === 'DELETE') return deleteDocument('results', first)
+    }
+    if (segments.length === 3 && first === 'classroom' && method === 'GET') {
+      return listDocuments('results', { classroomId: second, examId: queryParams.examId })
+    }
+    if (segments.length === 3 && first === 'student' && method === 'GET') {
+      return listDocuments('results', { studentId: second, ...queryParams })
+    }
+    if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
+      return listDocuments('results', { classroomId: second, examId: fourth })
     }
     if (segments.length === 2 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
       return updateDocument('results', first, { status: second, updatedAt: Timestamp.now() })
