@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { classroomApi } from '../services/api';
+import { classroomApi, teachersApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, School, Users, User, AlertCircle, Mail, Calendar, Clock } from 'lucide-react';
 import Homework from '../components/Homework';
@@ -21,7 +21,27 @@ function ViewClassroom() {
       setError(null);
       try {
         const data = await classroomApi.getById(id);
-        setClassroom(data);
+
+        const teacherId = data?.teacher_id || data?.teacherId || data?.teacher?.id || data?.teacher?._id || data?.assignedTeacher?.id || data?.assignedTeacher?._id;
+        let teacherName = data?.teacher_name || data?.teacherName || data?.teacher?.name || data?.assignedTeacher?.name || '';
+
+        if (!teacherName && teacherId) {
+          try {
+            const teachersData = await teachersApi.list();
+            const teacher = Array.isArray(teachersData)
+              ? teachersData.find((entry) => String(entry._id || entry.teacher_id || entry.id) === String(teacherId))
+              : null;
+
+            teacherName = teacher?.name || [teacher?.firstName, teacher?.lastName].filter(Boolean).join(' ') || '';
+          } catch (teacherErr) {
+            console.warn('Failed to resolve classroom teacher name', teacherErr);
+          }
+        }
+
+        setClassroom({
+          ...data,
+          teacher_name: teacherName || 'No teacher assigned',
+        });
       } catch (err) {
         setError(err.message || 'Failed to load classroom');
       } finally {
