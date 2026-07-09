@@ -107,12 +107,34 @@ function Payments() {
     })
   }
 
-  const getStudentName = (feeOrId) => {
-    if (!feeOrId) return 'Unknown'
-    const fee = typeof feeOrId === 'string' || typeof feeOrId === 'number'
-      ? getFeeInfo(feeOrId)
-      : feeOrId
+  const getStudentName = (feeOrPayment) => {
+    if (!feeOrPayment) return 'Unknown'
 
+    const payment = (feeOrPayment && feeOrPayment.student) || feeOrPayment.paymentDate || feeOrPayment.amount || feeOrPayment.method
+      ? feeOrPayment
+      : null
+
+    if (payment) {
+      const student = payment.student || payment.studentId || payment.studentName
+      if (student?.firstName || student?.lastName) {
+        return [student?.firstName, student?.lastName].filter(Boolean).join(' ')
+      }
+      if (typeof student === 'string') {
+        return student
+      }
+      if (student?.name) {
+        return student.name
+      }
+      if (payment.studentName) {
+        return payment.studentName
+      }
+    }
+
+    const feeId = typeof feeOrPayment === 'string' || typeof feeOrPayment === 'number'
+      ? feeOrPayment
+      : feeOrPayment.feeId || feeOrPayment.fee_id
+
+    const fee = getFeeInfo(feeId)
     if (!fee) return 'Unknown'
 
     if (fee.student?.firstName || fee.student?.lastName) {
@@ -133,9 +155,13 @@ function Payments() {
       return (
         payment._id?.toString().includes(query) ||
         payment.feeId?.toString().includes(query) ||
+        payment.fee_id?.toString().includes(query) ||
+        payment.amount?.toString().includes(query) ||
         payment.amountPaid?.toString().includes(query) ||
+        payment.paidAmount?.toString().includes(query) ||
         payment.method?.toLowerCase().includes(query) ||
-        getStudentName(payment.feeId).toLowerCase().includes(query)
+        payment.paymentMethod?.toLowerCase().includes(query) ||
+        getStudentName(payment).toLowerCase().includes(query)
       )
     })
   }, [payments, fees, searchQuery])
