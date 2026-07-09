@@ -802,14 +802,14 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       if (method === 'PUT') return updateDocument('results', first, body)
       if (method === 'DELETE') return deleteDocument('results', first)
     }
-    if (segments.length === 3 && second === 'classroom' && method === 'GET') {
-      return listDocuments('results', { classroomId: third, examId: queryParams.examId })
+    if (segments.length === 3 && first === 'classroom' && method === 'GET') {
+      return listDocuments('results', { classroomId: second, examId: queryParams.examId })
     }
-    if (segments.length === 3 && second === 'student' && method === 'GET') {
-      return listDocuments('results', { studentId: third, ...queryParams })
+    if (segments.length === 3 && first === 'student' && method === 'GET') {
+      return listDocuments('results', { studentId: second, ...queryParams })
     }
-    if (segments.length === 4 && second === 'classroom' && third === 'exam' && method === 'GET') {
-      return listDocuments('results', { classroomId: first, examId: fourth })
+    if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
+      return listDocuments('results', { classroomId: second, examId: fourth })
     }
     if (segments.length === 2 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
       return updateDocument('results', first, { status: second, updatedAt: Timestamp.now() })
@@ -819,7 +819,7 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       const promises = resultIds.map((id) => updateDocument('results', id, { status: third, updatedAt: Timestamp.now() }))
       return Promise.all(promises)
     }
-    if (segments.length === 3 && second === 'exam' && third === 'statistics' && method === 'GET') {
+    if (segments.length === 4 && second === 'exam' && third === 'statistics' && method === 'GET') {
       const results = await listDocuments('results', { examId: first, ...queryParams })
       const average = results.reduce((sum, item) => sum + (item.score || 0), 0) / Math.max(results.length, 1)
       return { average, count: results.length }
