@@ -72,21 +72,26 @@ function Results() {
     try {
       setLoading(true)
       const data = await resultApi.getClassroomExamResults(selectedClassroom, selectedExam)
-      
-      // If no results exist, initialize them
-      if (!data.results || data.results.length === 0) {
+      const resultsData = Array.isArray(data)
+        ? data
+        : data.results || data.data || []
+
+      if (resultsData.length === 0) {
         console.log('No results found, initializing...')
         await resultApi.initializeResults({
           exam: selectedExam,
           classroom: selectedClassroom
         })
-        
-        // Reload results
+
         const newData = await resultApi.getClassroomExamResults(selectedClassroom, selectedExam)
-        setResults(newData.results || [])
+        const initializedResults = Array.isArray(newData)
+          ? newData
+          : newData.results || newData.data || []
+
+        setResults(initializedResults)
         showSuccess('Results initialized for all students')
       } else {
-        setResults(data.results)
+        setResults(resultsData)
       }
     } catch (err) {
       showError(err.message || 'Failed to load results')

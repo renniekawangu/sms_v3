@@ -811,6 +811,77 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
       return listDocuments('results', { classroomId: second, examId: fourth })
     }
+    if (segments.length === 2 && first === 'initialize' && method === 'POST') {
+      if (!body?.exam || !body?.classroom) {
+        throw new Error('Exam and classroom are required to initialize results')
+      }
+
+      const examDoc = await getDocumentById('exams', body.exam)
+      const students = await listDocuments('students', { classroom_id: body.classroom })
+      const subjectIds = Array.isArray(examDoc.subjects) ? examDoc.subjects : []
+      const subjects = await Promise.all(subjectIds.map(async (subjectId) => {
+        if (typeof subjectId === 'object') return subjectId
+        return getDocumentById('subjects', subjectId)
+      }))
+
+      const resultsToCreate = []
+      for (const student of students) {
+        const studentName = student.name || [student.firstName, student.lastName].filter(Boolean).join(' ') || student.studentId || student._id
+        const studentId = student.studentId || student.uid || student._id
+
+        if (subjects.length === 0) {
+          resultsToCreate.push({
+            examId: examDoc._id,
+            classroomId: body.classroom,
+            studentId,
+            student: { _id: student._id, name: studentName, studentId },
+            exam: {
+              _id: examDoc._id,
+              name: examDoc.name,
+              term: examDoc.term,
+              academicYear: examDoc.academicYear,
+              totalMarks: examDoc.totalMarks || 100,
+            },
+            score: null,
+            maxMarks: examDoc.totalMarks || 100,
+            status: 'draft',
+            remarks: '',
+          })
+        } else {
+          for (const subject of subjects) {
+            const normalizedSubject = typeof subject === 'object' ? subject : { _id: subject, name: '', code: '' }
+            resultsToCreate.push({
+              examId: examDoc._id,
+              classroomId: body.classroom,
+              studentId,
+              student: { _id: student._id, name: studentName, studentId },
+              exam: {
+                _id: examDoc._id,
+                name: examDoc.name,
+                term: examDoc.term,
+                academicYear: examDoc.academicYear,
+                totalMarks: examDoc.totalMarks || 100,
+              },
+              subject: {
+                _id: normalizedSubject._id || normalizedSubject.id,
+                name: normalizedSubject.name || normalizedSubject.title || '',
+                code: normalizedSubject.code || '',
+              },
+              score: null,
+              maxMarks: examDoc.totalMarks || 100,
+              status: 'draft',
+              remarks: '',
+            })
+          }
+        }
+      }
+
+      const createdResults = []
+      for (const item of resultsToCreate) {
+        createdResults.push(await createDocument('results', item))
+      }
+      return createdResults
+    }
     if (segments.length === 2 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
       return updateDocument('results', first, { status: second, updatedAt: Timestamp.now() })
     }
