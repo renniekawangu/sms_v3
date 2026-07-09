@@ -506,6 +506,9 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (first === 'payments' && method === 'GET') {
       return listDocuments('payments', queryParams)
     }
+    if (first === 'payments' && second && method === 'PUT') {
+      return updateDocument('payments', second, body)
+    }
     if (first === 'payments' && method === 'POST') {
       return createDocument('payments', body)
     }
@@ -1843,6 +1846,13 @@ export const accountsApi = {
   createPayment: async (data) => {
     return apiCall('/accounts/payments', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updatePayment: async (payment_id, data) => {
+    return apiCall(`/accounts/payments/${payment_id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },

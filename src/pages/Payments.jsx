@@ -25,6 +25,7 @@ function Payments() {
     endDate: '',
     studentId: ''
   })
+  const [isApproving, setIsApproving] = useState(null)
   const { success, error: showError } = useToast()
 
   useEffect(() => {
@@ -89,6 +90,23 @@ function Payments() {
     } catch (err) {
       const errorMessage = err.message || 'Failed to record payment'
       showError(errorMessage)
+    }
+  }
+
+  const handleApprove = async (payment) => {
+    const paymentId = payment._id || payment.id
+    if (!paymentId) return
+
+    try {
+      setIsApproving(paymentId)
+      await accountsApi.updatePayment(paymentId, { status: 'paid' })
+      success('Payment approved')
+      await loadData()
+    } catch (err) {
+      const errorMessage = err.message || 'Failed to approve payment'
+      showError(errorMessage)
+    } finally {
+      setIsApproving(null)
     }
   }
 
@@ -363,7 +381,17 @@ function Payments() {
                           {(fee?.status === 'paid' || payment.status === 'paid') ? (
                             <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Paid</span>
                           ) : (
-                            <span className="inline-block px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
+                            <div className="flex flex-col gap-2">
+                              <span className="inline-block px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
+                              <button
+                                type="button"
+                                onClick={() => handleApprove(payment)}
+                                disabled={isApproving === (payment._id || payment.id)}
+                                className="mt-2 inline-flex items-center justify-center rounded-lg border border-primary-blue bg-white px-3 py-1 text-xs font-medium text-primary-blue hover:bg-primary-blue/5 disabled:opacity-50"
+                              >
+                                {isApproving === (payment._id || payment.id) ? 'Approving…' : 'Approve'}
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

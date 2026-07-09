@@ -87,7 +87,8 @@ function PaymentForm({ payment, fees, onSubmit, onCancel }) {
         ...formData,
         feeId: formData.feeId,
         amount: parseFloat(formData.amount),
-        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : formData.paymentDate
+        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : formData.paymentDate,
+        status: 'pending'
       })
     }
   }
