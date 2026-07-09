@@ -78,11 +78,12 @@ function Subjects() {
     if (!searchQuery.trim()) return subjects
     const query = searchQuery.toLowerCase()
     return subjects.filter((subject) => {
+      const subjectId = subject.subject_id || subject._id || ''
       return (
         subject.name?.toLowerCase().includes(query) ||
-        subject.code?.toLowerCase().includes(query) ||
+        (subject.code || '').toLowerCase().includes(query) ||
         subject.grade?.toString().includes(query) ||
-        subject.subject_id?.toString().includes(query)
+        subjectId.toString().includes(query)
       )
     })
   }, [subjects, searchQuery])
@@ -168,7 +169,7 @@ function Subjects() {
               ) : (
                 filteredSubjects.map((subject) => (
                   <tr key={subject._id || subject.subject_id || Math.random()} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 text-sm text-text-dark">{subject.subject_id}</td>
+                    <td className="py-3 px-4 text-sm text-text-dark">{subject.subject_id || subject._id}</td>
                     <td className="py-3 px-4 text-sm text-text-dark font-medium">{subject.name}</td>
                     <td className="py-3 px-4 text-sm text-text-dark">{subject.code || '-'}</td>
                     <td className="py-3 px-4 text-sm text-text-muted">Grade {subject.grade}</td>

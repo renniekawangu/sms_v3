@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 function SubjectForm({ subject, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
     grade: '',
     description: '',
   })
@@ -12,6 +13,7 @@ function SubjectForm({ subject, onSubmit, onCancel }) {
     if (subject) {
       setFormData({
         name: subject.name || '',
+        code: subject.code || '',
         grade: subject.grade || '',
         description: subject.description || '',
       })
@@ -80,6 +82,20 @@ function SubjectForm({ subject, onSubmit, onCancel }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="code" className="block text-sm font-medium text-text-dark mb-2">
+            Code
+          </label>
+          <input
+            type="text"
+            id="code"
+            name="code"
+            value={formData.code}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue"
+            placeholder="Enter subject code"
+          />
+        </div>
         <div>
           <label htmlFor="grade" className="block text-sm font-medium text-text-dark mb-2">
             Grade <span className="text-red-500">*</span>
