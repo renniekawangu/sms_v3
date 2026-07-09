@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CheckCircle, Search, AlertCircle, Users, Calendar, Download } from 'lucide-react'
-import { attendanceApi, classroomsApi, teacherApi } from '../services/api'
+import { attendanceApi, classroomsApi, teacherApi, studentsApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { ROLES } from '../config/rbac'
@@ -52,25 +52,65 @@ function Attendance() {
   const loadClassroomStudents = async () => {
     if (!selectedClassroom) return
     try {
-      // Fetch full student details for the classroom
-      if (selectedClassroom._id) {
-        const response = await teacherApi.getClassroomStudents(selectedClassroom._id)
-        const students = response?.data || response || []
-        if (!Array.isArray(students) || students.length === 0) {
-          setClassroomStudents([])
-          showError('No students found for this classroom. Please check that students are assigned to this classroom in the backend.')
-          // Debug log
-          // eslint-disable-next-line no-console
-          console.warn('No students found for classroom', selectedClassroom._id, students)
-        } else {
-          setClassroomStudents(students)
+      const normalizeStudent = (student) => {
+        if (!student) return null
+        if (typeof student === 'string' || typeof student === 'number') return null
+        return {
+          ...student,
+          _id: student._id || student.id || student.student_id || student.studentId,
+          name: student.name || [student.firstName, student.lastName].filter(Boolean).join(' ').trim() || 'Student'
         }
-      } else if (selectedClassroom.students && selectedClassroom.students.length > 0) {
-        // Fallback: use students from classroom object if available
-        setClassroomStudents(selectedClassroom.students)
+      }
+
+      const matchesClassroom = (student) => {
+        if (!student) return false
+        const classroomId = selectedClassroom._id || selectedClassroom.id
+        const assignedIds = Array.isArray(selectedClassroom.students) ? selectedClassroom.students : []
+        const studentIds = [student._id, student.id, student.student_id, student.studentId, student.classroom_id, student.classroomId, student.classroom]
+        return studentIds.some((value) => String(value) === String(classroomId)) || assignedIds.some((value) => String(value) === String(student._id || student.id || student.student_id || student.studentId))
+      }
+
+      if (selectedClassroom._id) {
+        try {
+          const response = await teacherApi.getClassroomStudents(selectedClassroom._id)
+          const rawStudents = response?.data || response || []
+          const students = (Array.isArray(rawStudents) ? rawStudents : []).map(normalizeStudent).filter(Boolean)
+          if (students.length > 0) {
+            setClassroomStudents(students)
+            return
+          }
+        } catch (apiErr) {
+          // eslint-disable-next-line no-console
+          console.warn('Teacher classroom students endpoint failed, falling back to local student lookup', apiErr)
+        }
+      }
+
+      const classroomStudentIds = Array.isArray(selectedClassroom.students) ? selectedClassroom.students : []
+      if (classroomStudentIds.length > 0) {
+        const studentsData = await studentsApi.list()
+        const studentList = (Array.isArray(studentsData) ? studentsData : studentsData?.students || studentsData?.data || [])
+        const resolvedStudents = studentList
+          .map(normalizeStudent)
+          .filter(Boolean)
+          .filter((student) => classroomStudentIds.some((value) => String(value) === String(student._id || student.id || student.student_id || student.studentId)))
+
+        if (resolvedStudents.length > 0) {
+          setClassroomStudents(resolvedStudents)
+          return
+        }
+      }
+
+      const allStudents = await studentsApi.list()
+      const studentList = (Array.isArray(allStudents) ? allStudents : allStudents?.students || allStudents?.data || [])
+      const classroomStudents = studentList
+        .map(normalizeStudent)
+        .filter(Boolean)
+        .filter(matchesClassroom)
+
+      if (classroomStudents.length > 0) {
+        setClassroomStudents(classroomStudents)
       } else {
         setClassroomStudents([])
-        showError('No students assigned to this classroom.')
       }
     } catch (err) {
       showError(err.message || 'Failed to load classroom students')
