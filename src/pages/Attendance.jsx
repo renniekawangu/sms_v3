@@ -130,12 +130,10 @@ function Attendance() {
       const allRecords = data?.data || data || []
       const filteredRecords = allRecords.filter(record => {
         if (!selectedDate) return true
-        // Normalize both dates to YYYY-MM-DD format for comparison
-        const recordDate = record.date instanceof Date 
-          ? record.date.toISOString().split('T')[0]
-          : (record.date.includes('T') ? record.date.split('T')[0] : record.date)
-        // eslint-disable-next-line no-console
-        console.log('Date comparison:', { recordDate, selectedDate, match: recordDate === selectedDate })
+        const rawDate = record.date || record.createdAt || record.updatedAt
+        const recordDate = rawDate instanceof Date
+          ? rawDate.toISOString().split('T')[0]
+          : (typeof rawDate === 'string' ? (rawDate.includes('T') ? rawDate.split('T')[0] : rawDate) : '')
         return recordDate === selectedDate
       })
       // eslint-disable-next-line no-console
@@ -168,7 +166,9 @@ function Attendance() {
         studentId,
         status,
         date: selectedDate,
-        markedBy: user?.user_id
+        classroom_id: selectedClassroom?._id || selectedClassroom?.id || null,
+        classroomId: selectedClassroom?._id || selectedClassroom?.id || null,
+        markedBy: user?.user_id || user?.uid || user?.id || null
       }))
 
     if (recordsToSave.length === 0) {
