@@ -612,6 +612,9 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (first === 'classroom' && second && third === 'students' && method === 'GET') {
       return listDocuments('students', { classroom_id: second })
     }
+    if (first === 'classroom' && second && third === 'attendance' && method === 'GET') {
+      return listDocuments('attendance', { classroom_id: second })
+    }
     if (first === 'subjects' && method === 'GET') {
       return listDocuments('subjects', { teacher_id: currentUser.uid })
     }
