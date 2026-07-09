@@ -1642,16 +1642,25 @@ export const settingsApi = {
 
   // Academic Years
   getAllAcademicYears: async () => {
-    return apiCall('/settings/academic-years', {
+    const result = await apiCall('/settings/academic-years', {
       method: 'GET',
     });
+    return Array.isArray(result)
+      ? { academicYears: result, currentYear: null }
+      : result;
   },
 
   createAcademicYear: async (data) => {
-    return apiCall('/settings/academic-years', {
+    const createdYear = await apiCall('/settings/academic-years', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+
+    if (data?.isCurrent && createdYear?._id) {
+      await settingsApi.setCurrentAcademicYear(createdYear._id);
+    }
+
+    return createdYear;
   },
 
   updateAcademicYear: async (year_id, data) => {
@@ -1664,6 +1673,7 @@ export const settingsApi = {
   setCurrentAcademicYear: async (year_id) => {
     return apiCall(`/settings/academic-years/${year_id}/set-current`, {
       method: 'POST',
+      body: JSON.stringify({ year_id }),
     });
   },
 

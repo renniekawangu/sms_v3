@@ -139,7 +139,7 @@ function Settings() {
       setShowNewAcademicYear(false)
       setNewAcademicYearForm({ year: '', startDate: '', endDate: '', isCurrent: false, terms: [] })
       setNewTerm({ name: '', startDate: '', endDate: '' })
-      loadTabData()
+      await loadTabData()
     } catch (error) {
       showToast(error.message, 'error')
     }
