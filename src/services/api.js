@@ -788,6 +788,9 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   if (resource === 'homework') {
     if (segments.length === 1 && method === 'GET') return listDocuments('homework', queryParams)
     if (segments.length === 2 && method === 'GET') return getDocumentById('homework', first)
+    if (segments.length === 3 && second === 'classroom' && method === 'GET') {
+      return listDocuments('homework', { ...queryParams, classroomId: third })
+    }
     if (segments.length === 2 && method === 'PUT') return updateDocument('homework', first, body)
     if (segments.length === 1 && method === 'POST') return createDocument('homework', body)
     if (segments.length === 2 && method === 'DELETE') return deleteDocument('homework', first)
