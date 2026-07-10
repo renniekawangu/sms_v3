@@ -4,12 +4,13 @@ import { Plus, Upload, Eye, AlertCircle, Loader, CheckCircle, Send, Check, Downl
 import { resultApi, examApi, classroomApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
 import ResultsEntryForm from '../components/ResultsEntryForm'
 import PageHeader from '../components/PageHeader'
 
 function Results() {
   const { user } = useAuth()
+  const normalizedUserRole = normalizeRole(user?.role)
   const navigate = useNavigate()
   const { error: showError, success: showSuccess } = useToast()
   
@@ -357,7 +358,7 @@ function Results() {
                 </button>
               )}
               {/* Approve All button for submitted results */}
-              {(user.role === ROLES.HEAD_TEACHER || user.role === ROLES.ADMIN) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'submitted') && (
+              {(normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'submitted') && (
                 <button
                   onClick={() => handleBulkAction('bulkApprove')}
                   disabled={bulkProcessing}
@@ -368,7 +369,7 @@ function Results() {
                 </button>
               )}
               {/* Publish All button for approved results */}
-              {(user.role === ROLES.ADMIN || user.role === ROLES.HEAD_TEACHER) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'approved') && (
+              {(normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'approved') && (
                 <button
                   onClick={() => handleBulkAction('bulkPublish')}
                   disabled={bulkProcessing}
@@ -473,7 +474,7 @@ function Results() {
                           Submit
                         </button>
                       )}
-                      {result.status === 'submitted' && (user.role === ROLES.HEAD_TEACHER || user.role === ROLES.ADMIN) && (
+                      {result.status === 'submitted' && (normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && (
                         <button
                           onClick={() => handleStatusTransition(result._id, 'submitted')}
                           disabled={transitioningId === result._id}
@@ -483,7 +484,7 @@ function Results() {
                           Approve
                         </button>
                       )}
-                      {result.status === 'approved' && (user.role === ROLES.ADMIN || user.role === ROLES.HEAD_TEACHER) && (
+                      {result.status === 'approved' && (normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && (
                         <button
                           onClick={() => handleStatusTransition(result._id, 'approved')}
                           disabled={transitioningId === result._id}

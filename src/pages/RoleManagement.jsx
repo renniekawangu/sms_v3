@@ -5,6 +5,9 @@ import RoleForm from '../components/RoleForm'
 import { useToast } from '../contexts/ToastContext'
 import { rolesApi } from '../services/rolesApi'
 import { PERMISSION_DESCRIPTIONS } from '../config/permissions'
+import { PERMISSIONS } from '../config/rbac'
+import { useAuth } from '../contexts/AuthContext'
+import { getRoleIdentifier, getRoleListKey } from '../utils/roleListKey'
 
 function RoleManagement() {
   const [roles, setRoles] = useState([])
@@ -16,10 +19,28 @@ function RoleManagement() {
   const [modalMode, setModalMode] = useState('create') // 'create' or 'edit'
   const [viewDetailsRole, setViewDetailsRole] = useState(null)
   const { success, error } = useToast()
+  const { hasPermission } = useAuth()
+  const canManageRoles = hasPermission(PERMISSIONS.ROLE_ASSIGN)
 
   useEffect(() => {
     loadRoles()
   }, [])
+
+  const normalizeRoles = (items = []) => {
+    return items.map((role, index) => {
+      const resolvedId = getRoleIdentifier(role, index)
+      if (!resolvedId) {
+        return role
+      }
+
+      return {
+        ...role,
+        _id: resolvedId,
+        id: resolvedId,
+        role_id: resolvedId,
+      }
+    })
+  }
 
   const loadRoles = async () => {
     try {
@@ -28,11 +49,11 @@ function RoleManagement() {
       try {
         const data = await rolesApi.list()
         const items = Array.isArray(data) ? data : (data.data || data.roles || [])
-        setRoles(items)
+        setRoles(normalizeRoles(items))
       } catch (err) {
         console.warn('API not available, using mock data')
         // Mock data for demonstration
-        setRoles([
+        setRoles(normalizeRoles([
           {
             role_id: 1,
             name: 'Admin',
@@ -66,7 +87,7 @@ function RoleManagement() {
             permissions: ['view_dashboard', 'view_fees', 'manage_fees', 'view_payments', 'create_payment'],
             created_at: '2024-01-01',
           },
-        ])
+        ]))
       }
     } catch (err) {
       console.error('Error loading roles:', err)
@@ -79,11 +100,24 @@ function RoleManagement() {
   const handleCreateRole = async (formData) => {
     try {
       setIsFormLoading(true)
-      await rolesApi.create(formData)
+      const resolvedId = getRoleIdentifier(formData) || `local-role-${Date.now()}`
+      const payload = {
+        ...formData,
+        _id: resolvedId,
+        id: resolvedId,
+        role_id: resolvedId,
+      }
+
+      try {
+        await rolesApi.create(payload)
+      } catch (err) {
+        console.warn('Role API unavailable, using local role state', err)
+      }
+
+      setRoles((prev) => normalizeRoles([payload, ...prev]))
       success('Role created successfully')
       setIsModalOpen(false)
       setSelectedRole(null)
-      await loadRoles()
     } catch (err) {
       error(err.message || 'Failed to create role')
     } finally {
@@ -95,12 +129,28 @@ function RoleManagement() {
     if (!selectedRole) return
     try {
       setIsFormLoading(true)
-      const id = selectedRole._id || selectedRole.id || selectedRole.role_id
-      await rolesApi.update(id, formData)
+      const id = getRoleIdentifier(selectedRole) || getRoleIdentifier(formData)
+      if (!id) {
+        throw new Error('Role id is required')
+      }
+
+      const payload = {
+        ...formData,
+        _id: id,
+        id,
+        role_id: id,
+      }
+
+      try {
+        await rolesApi.update(id, payload)
+      } catch (err) {
+        console.warn('Role API unavailable, using local role state', err)
+      }
+
+      setRoles((prev) => normalizeRoles(prev.map((role) => (getRoleIdentifier(role) === id ? payload : role))))
       success('Role updated successfully')
       setIsModalOpen(false)
       setSelectedRole(null)
-      await loadRoles()
     } catch (err) {
       error(err.message || 'Failed to update role')
     } finally {
@@ -113,21 +163,41 @@ function RoleManagement() {
       return
     }
     try {
-      await rolesApi.delete(roleId)
+      const resolvedId = getRoleIdentifier(roleId)
+      if (!resolvedId) {
+        throw new Error('Role id is required')
+      }
+
+      try {
+        await rolesApi.delete(resolvedId)
+      } catch (err) {
+        console.warn('Role API unavailable, using local role state', err)
+      }
+
+      setRoles((prev) => normalizeRoles(prev.filter((role) => getRoleIdentifier(role) !== resolvedId)))
       success('Role deleted successfully')
-      await loadRoles()
     } catch (err) {
       error(err.message || 'Failed to delete role')
     }
   }
 
   const handleEditClick = (role) => {
+    if (!canManageRoles) {
+      error('You do not have permission to manage roles')
+      return
+    }
+
     setSelectedRole(role)
     setModalMode('edit')
     setIsModalOpen(true)
   }
 
   const handleCreateClick = () => {
+    if (!canManageRoles) {
+      error('You do not have permission to manage roles')
+      return
+    }
+
     setSelectedRole(null)
     setModalMode('create')
     setIsModalOpen(true)
@@ -164,7 +234,8 @@ function RoleManagement() {
         </div>
         <button
           onClick={handleCreateClick}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary-blue text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-primary-blue/90 transition-colors font-medium text-xs sm:text-sm"
+          disabled={!canManageRoles}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary-blue text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-primary-blue/90 transition-colors font-medium text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Plus size={18} />
           Create Role
@@ -196,9 +267,9 @@ function RoleManagement() {
             </div>
           </div>
         ) : (
-          filteredRoles.map((role) => (
+          filteredRoles.map((role, index) => (
             <div
-              key={role.id || role.name || role.role_id}
+              key={getRoleListKey(role, index)}
               className="bg-card-white rounded-custom shadow-custom hover:shadow-lg transition-all overflow-hidden"
             >
               <div className="p-6 space-y-4">
@@ -253,14 +324,16 @@ function RoleManagement() {
                   </button>
                   <button
                     onClick={() => handleEditClick(role)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                    disabled={!canManageRoles}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Edit2 size={16} />
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteRole(role.id || role.role_id, role.name)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
+                    onClick={() => handleDeleteRole(getRoleIdentifier(role), role.name)}
+                    disabled={!canManageRoles}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Trash2 size={16} />
                     Delete
@@ -344,7 +417,8 @@ function RoleManagement() {
               setViewDetailsRole(null)
               handleEditClick(viewDetailsRole)
             }}
-            className="w-full px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-primary-blue/90 transition-colors font-medium mt-4"
+            disabled={!canManageRoles}
+            className="w-full px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-primary-blue/90 transition-colors font-medium mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Edit Role
           </button>

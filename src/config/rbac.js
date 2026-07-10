@@ -13,6 +13,32 @@ export const ROLES = {
   PARENT: 'parent'
 };
 
+const ROLE_ALIASES = {
+  [ROLES.ADMIN]: ROLES.ADMIN,
+  [ROLES.STUDENT]: ROLES.STUDENT,
+  [ROLES.TEACHER]: ROLES.TEACHER,
+  [ROLES.HEAD_TEACHER]: ROLES.HEAD_TEACHER,
+  [ROLES.ACCOUNTS]: ROLES.ACCOUNTS,
+  [ROLES.PARENT]: ROLES.PARENT,
+  'head teacher': ROLES.HEAD_TEACHER,
+  'head_teacher': ROLES.HEAD_TEACHER,
+  'head-teacher': ROLES.HEAD_TEACHER,
+  'teacher': ROLES.TEACHER,
+  'student': ROLES.STUDENT,
+  'admin': ROLES.ADMIN,
+  'parent': ROLES.PARENT,
+  'accounts': ROLES.ACCOUNTS,
+};
+
+export function normalizeRole(role) {
+  if (typeof role !== 'string') return ROLES.STUDENT
+
+  const trimmedRole = role.trim().toLowerCase()
+  if (!trimmedRole) return ROLES.STUDENT
+
+  return ROLE_ALIASES[trimmedRole] || trimmedRole
+}
+
 /**
  * Permission descriptions mapped from roles.permissions.json
  * Format: "action:resource:scope"
@@ -194,8 +220,9 @@ export const SELF_ACCESS_PERMISSIONS = [
  * @returns {boolean}
  */
 export function hasPermission(role, permission) {
-  if (role === ROLES.ADMIN) return true; // Admin has all permissions
-  return ROLE_PERMISSIONS[role]?.includes(permission) || false;
+  const normalizedRole = normalizeRole(role)
+  if (normalizedRole === ROLES.ADMIN) return true; // Admin has all permissions
+  return ROLE_PERMISSIONS[normalizedRole]?.includes(permission) || false;
 }
 
 /**
@@ -205,9 +232,10 @@ export function hasPermission(role, permission) {
  * @returns {boolean}
  */
 export function canAccessRoute(role, route) {
-  if (role === ROLES.ADMIN) return true; // Admin can access all routes
+  const normalizedRole = normalizeRole(role)
+  if (normalizedRole === ROLES.ADMIN) return true; // Admin can access all routes
   const allowedRoles = ROUTE_ACCESS[route];
-  return allowedRoles && allowedRoles.includes(role);
+  return Boolean(allowedRoles && allowedRoles.includes(normalizedRole));
 }
 
 /**

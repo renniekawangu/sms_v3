@@ -1,6 +1,7 @@
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { SELF_ACCESS_PERMISSIONS } from '../config/rbac'
+import { hasRequiredRole } from '../utils/rbacAccess'
 
 /**
  * Component to conditionally render content based on permissions
@@ -23,7 +24,7 @@ export function PermissionGate({
   const { hasPermission, hasAnyPermission, hasAllPermissions, user, isSelfAccessOnly } = useAuth()
 
   // Check role restriction if provided
-  if (requiredRole && user?.role !== requiredRole) {
+  if (requiredRole && !hasRequiredRole(user?.role, requiredRole)) {
     return fallback || <AccessDeniedMessage reason="insufficient_role" />
   }
 

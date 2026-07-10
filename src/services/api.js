@@ -3,7 +3,8 @@ import { doc, collection, getDoc, getDocs, addDoc, setDoc, updateDoc as firestor
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth'
 import { jsPDF } from 'jspdf'
 import { auth, db, firebaseConfig } from './firebaseConfig'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
+import { listStudentsForResultsInitialization } from './resultsUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
@@ -211,7 +212,7 @@ const userProfileToTeacher = (user = {}) => {
   const nameParts = splitName(user.name)
   const firstName = user.firstName || nameParts.firstName || user.email || 'Staff'
   const lastName = user.lastName || nameParts.lastName || ''
-  const role = user.role === ROLES.HEAD_TEACHER ? ROLES.HEAD_TEACHER : ROLES.TEACHER
+  const role = normalizeRole(user.role) === ROLES.HEAD_TEACHER ? ROLES.HEAD_TEACHER : ROLES.TEACHER
 
   return {
     _id: id,
@@ -252,15 +253,15 @@ const userProfileToParent = (user = {}) => {
 }
 
 const mirrorRoleProfile = async (id, user = {}) => {
-  if (user.role === ROLES.STUDENT) {
+  if (normalizeRole(user.role) === ROLES.STUDENT) {
     await setDoc(doc(db, 'students', id), userProfileToStudent({ ...user, _id: id }), { merge: true })
   }
 
-  if (user.role === ROLES.TEACHER || user.role === ROLES.HEAD_TEACHER) {
+  if (normalizeRole(user.role) === ROLES.TEACHER || normalizeRole(user.role) === ROLES.HEAD_TEACHER) {
     await setDoc(doc(db, 'teachers', id), userProfileToTeacher({ ...user, _id: id }), { merge: true })
   }
 
-  if (user.role === ROLES.PARENT) {
+  if (normalizeRole(user.role) === ROLES.PARENT) {
     await setDoc(doc(db, 'parents', id), userProfileToParent({ ...user, _id: id }), { merge: true })
   }
 }
@@ -812,7 +813,9 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       }
 
       const examDoc = await getDocumentById('exams', body.exam)
-      const students = await listDocuments('students', { classroom_id: body.classroom })
+      const students = await listStudentsForResultsInitialization(body.classroom, async (collectionName, params) => {
+        return listDocuments(collectionName, params)
+      })
       const subjectIds = Array.isArray(examDoc.subjects) ? examDoc.subjects : []
       const subjects = await Promise.all(subjectIds.map(async (subjectId) => {
         if (typeof subjectId === 'object') return subjectId

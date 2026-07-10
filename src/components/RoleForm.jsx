@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { X } from 'lucide-react'
+import { getRoleIdentifier } from '../utils/roleListKey'
 
 const AVAILABLE_PERMISSIONS = [
   { id: 'view_dashboard', name: 'View Dashboard', category: 'Dashboard' },
@@ -93,8 +94,10 @@ function RoleForm({ role, onSubmit, onCancel, isLoading }) {
     }
 
     try {
+      const roleIdentifier = getRoleIdentifier(role)
       await onSubmit({
         ...formData,
+        ...(roleIdentifier ? { _id: roleIdentifier, id: roleIdentifier, role_id: roleIdentifier } : {}),
         permissions: Array.from(selectedPermissions),
       })
     } catch (err) {

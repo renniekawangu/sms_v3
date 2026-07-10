@@ -1,5 +1,5 @@
 import { useAuth } from '../contexts/AuthContext'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
 import { useSettings } from '../contexts/SettingsContext'
 import { Link } from 'react-router-dom'
 import { GraduationCap, User, Users, School, FileText, Award, DollarSign, Calendar, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
@@ -887,7 +887,7 @@ function HeadTeacherDashboard (){
 // Main Dashboard Component
 function Dashboard() {
   const { user } = useAuth()
-  const userRole = user?.role || ROLES.ADMIN
+  const userRole = normalizeRole(user?.role || ROLES.ADMIN)
 
   if (userRole === ROLES.ADMIN) {
     return <AdminDashboard />

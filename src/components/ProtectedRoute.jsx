@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { ROLES, ROUTE_ACCESS } from '../config/rbac'
+import { ROLES, ROUTE_ACCESS, normalizeRole } from '../config/rbac'
 
 /**
  * ProtectedRoute Component
@@ -27,11 +27,13 @@ function ProtectedRoute({ children, requiredRole, requiredPermission, route }) {
     return <Navigate to="/login" replace />
   }
 
+  const normalizedRole = normalizeRole(user?.role)
+
   // Check route access if route is provided
   if (route) {
     const allowedRoles = ROUTE_ACCESS[route]
     if (allowedRoles && allowedRoles.length > 0) {
-      if (user?.role !== ROLES.ADMIN && !allowedRoles.includes(user?.role)) {
+      if (normalizedRole !== ROLES.ADMIN && !allowedRoles.includes(normalizedRole)) {
         console.warn(`[ACCESS DENIED] User role "${user?.role}" cannot access route "${route}"`)
         return <Navigate to="/" replace />
       }
@@ -41,7 +43,7 @@ function ProtectedRoute({ children, requiredRole, requiredPermission, route }) {
   // Check role-based access (supports both single string and array of roles)
   if (requiredRole) {
     const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
-    if (user?.role !== ROLES.ADMIN && !allowedRoles.includes(user?.role)) {
+    if (normalizedRole !== ROLES.ADMIN && !allowedRoles.includes(normalizedRole)) {
       console.warn(`[ACCESS DENIED] User role "${user?.role}" is not in allowed roles: ${allowedRoles.join(', ')}`)
       return <Navigate to="/" replace />
     }

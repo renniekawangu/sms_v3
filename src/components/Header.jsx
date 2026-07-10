@@ -4,14 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../services/api'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
 import { useDebounce } from '../utils/debounce'
 
 function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
   const { success } = useToast()
   const navigate = useNavigate()
-  const isAdmin = user?.role === ROLES.ADMIN
+  const isAdmin = normalizeRole(user?.role) === ROLES.ADMIN
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)

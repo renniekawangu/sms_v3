@@ -5,7 +5,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { teacherApi } from '../services/api'
-import { ROLES, ROUTE_ACCESS } from '../config/rbac'
+import { ROLES, ROUTE_ACCESS, normalizeRole } from '../config/rbac'
 
 /**
  * Role-based menu items definition
@@ -55,7 +55,7 @@ function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth()
   const { success } = useToast()
   const navigate = useNavigate()
-  const userRole = user?.role || ROLES.ADMIN
+  const userRole = normalizeRole(user?.role || ROLES.ADMIN)
   const [teacherClassroomId, setTeacherClassroomId] = useState(null)
 
   useEffect(() => {

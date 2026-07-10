@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { onAuthStateChanged } from 'firebase/auth'
 import { authApi, AUTH_LOGOUT_EVENT } from '../services/api'
 import { auth } from '../services/firebaseConfig'
-import { ROLE_PERMISSIONS, ROLES, canAccessRoute, requiresSelfAccessOnly } from '../config/rbac'
+import { ROLE_PERMISSIONS, ROLES, canAccessRoute, requiresSelfAccessOnly, normalizeRole } from '../config/rbac'
 
 const defaultAuthContext = {
   user: null,
@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
     const syncUserState = (userData) => {
       if (!isMounted) return
       setUser(userData)
-      setPermissions(userData ? (ROLE_PERMISSIONS[userData.role] || []) : [])
+      setPermissions(userData ? (ROLE_PERMISSIONS[normalizeRole(userData.role)] || []) : [])
     }
 
     const clearAuthState = () => {
@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
         const userData = {
           user_id: firebaseUser.uid,
           email: firebaseUser.email || profile.email,
-          role: profile.role || 'student',
+          role: normalizeRole(profile.role),
           token,
           name: profile.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
           ...profile,
@@ -88,7 +88,7 @@ export function AuthProvider({ children }) {
    */
   const hasPermissionCheck = useCallback((permission) => {
     if (!user) return false
-    if (user.role === ROLES.ADMIN) return true // Admin has all permissions
+    if (normalizeRole(user.role) === ROLES.ADMIN) return true // Admin has all permissions
     return permissions.includes(permission)
   }, [user, permissions])
 
@@ -129,7 +129,7 @@ export function AuthProvider({ children }) {
       const userData = {
         user_id: response.user_id,
         email,
-        role: response.role,
+        role: normalizeRole(response.role),
         token: response.token,
         name: response.name || 'User'
       }
@@ -138,7 +138,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('user', JSON.stringify(userData))
       
       // Load permissions based on role using RBAC config
-      const rolePermissions = ROLE_PERMISSIONS[userData.role] || []
+      const rolePermissions = ROLE_PERMISSIONS[normalizeRole(userData.role)] || []
       setPermissions(rolePermissions)
       
       return { success: true }
