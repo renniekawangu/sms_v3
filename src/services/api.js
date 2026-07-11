@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, si
 import { jsPDF } from 'jspdf'
 import { auth, db, firebaseConfig } from './firebaseConfig'
 import { ROLES, normalizeRole } from '../config/rbac'
-import { listStudentsForResultsInitialization } from './resultsUtils'
+import { listStudentsForResultsInitialization, calculateGrade } from './resultsUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
@@ -725,8 +725,23 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return { message: 'Parent dashboard is powered by Firestore collections.' }
     }
     if (first === 'children' && second === undefined && method === 'GET') {
-      const profile = await getCurrentUserProfile()
-      return listDocuments('students', { parentId: currentUser.uid })
+      const parentDoc = await getDocumentById('parents', currentUser.uid).catch(() => null)
+      const linkedRefs = parentDoc?.students || []
+      const [linkedStudents, directlyLinkedStudents] = await Promise.all([
+        Promise.all(
+          linkedRefs.map((ref) => {
+            const id = typeof ref === 'object' ? (ref._id || ref.id) : ref
+            return getDocumentById('students', id).catch(() => null)
+          })
+        ),
+        listDocuments('students', { parentId: currentUser.uid }).catch(() => []),
+      ])
+
+      const byId = new Map()
+      ;[...linkedStudents.filter(Boolean), ...directlyLinkedStudents].forEach((student) => {
+        byId.set(student._id, student)
+      })
+      return Array.from(byId.values())
     }
     if (first === 'children' && second && third === 'progress' && method === 'GET') {
       return listDocuments('results', { studentId: second })
@@ -789,8 +804,8 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   if (resource === 'homework') {
     if (segments.length === 1 && method === 'GET') return listDocuments('homework', queryParams)
     if (segments.length === 2 && method === 'GET') return getDocumentById('homework', first)
-    if (segments.length === 3 && second === 'classroom' && method === 'GET') {
-      return listDocuments('homework', { ...queryParams, classroomId: third })
+    if (segments.length === 3 && first === 'classroom' && method === 'GET') {
+      return listDocuments('homework', { ...queryParams, classroomId: second })
     }
     if (segments.length === 2 && method === 'PUT') return updateDocument('homework', first, body)
     if (segments.length === 1 && method === 'POST') return createDocument('homework', body)
@@ -881,8 +896,18 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return createdResults
     }
     if (segments.length === 2) {
-      if (method === 'GET') return getDocumentById('results', first)
-      if (method === 'PUT') return updateDocument('results', first, body)
+      if (method === 'GET' && first !== 'pending') return getDocumentById('results', first)
+      if (method === 'PUT') {
+        // Auto-derive the letter grade whenever a score is being saved and
+        // no explicit grade was provided, so results always stay in sync.
+        let payload = body
+        if (body && body.score !== undefined && body.grade === undefined) {
+          const existing = await getDocumentById('results', first).catch(() => null)
+          const maxMarks = body.maxMarks ?? existing?.maxMarks ?? 100
+          payload = { ...body, grade: calculateGrade(body.score, maxMarks) }
+        }
+        return updateDocument('results', first, payload)
+      }
       if (method === 'DELETE') return deleteDocument('results', first)
     }
     if (segments.length === 3 && first === 'classroom' && method === 'GET') {
@@ -894,16 +919,19 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
       return listDocuments('results', { classroomId: second, examId: fourth })
     }
-    if (segments.length === 2 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
+    if (segments.length === 3 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
       return updateDocument('results', first, { status: second, updatedAt: Timestamp.now() })
     }
-    if (segments.length === 3 && second === 'bulk' && ['submit', 'approve', 'publish'].includes(third) && method === 'POST') {
+    if (segments.length === 3 && second === 'reject' && method === 'POST') {
+      return updateDocument('results', first, { status: 'rejected', rejectionReason: body?.reason || '', updatedAt: Timestamp.now() })
+    }
+    if (segments.length === 3 && first === 'bulk' && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
       const resultIds = body?.resultIds || []
-      const promises = resultIds.map((id) => updateDocument('results', id, { status: third, updatedAt: Timestamp.now() }))
+      const promises = resultIds.map((id) => updateDocument('results', id, { status: second, updatedAt: Timestamp.now() }))
       return Promise.all(promises)
     }
-    if (segments.length === 4 && second === 'exam' && third === 'statistics' && method === 'GET') {
-      const results = await listDocuments('results', { examId: first, ...queryParams })
+    if (segments.length === 4 && first === 'exam' && third === 'statistics' && method === 'GET') {
+      const results = await listDocuments('results', { examId: second, ...queryParams })
       const average = results.reduce((sum, item) => sum + (item.score || 0), 0) / Math.max(results.length, 1)
       return { average, count: results.length }
     }

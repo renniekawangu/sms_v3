@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { resultApi } from '../services/api';
+import { calculateGrade } from '../services/resultsUtils';
 
 export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroomId, examId, results = [] }) {
   const [formData, setFormData] = useState({});
@@ -45,9 +46,11 @@ export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroom
         const resultId = result._id || result.studentId;
         const data = formData[resultId];
         if (data?.score !== '') {
+          const numericScore = parseFloat(data.score);
           await resultApi.update(result._id, {
-            score: parseFloat(data.score),
+            score: numericScore,
             remarks: data.remarks,
+            grade: calculateGrade(numericScore, result.maxMarks),
           });
         }
       }
