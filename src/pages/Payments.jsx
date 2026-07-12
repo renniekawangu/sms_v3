@@ -442,6 +442,7 @@ function Payments() {
       >
         <PaymentForm
           fees={fees}
+          students={students}
           onSubmit={handleSubmit}
           onCancel={() => setIsModalOpen(false)}
         />

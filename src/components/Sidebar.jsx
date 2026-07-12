@@ -27,7 +27,7 @@ const allMenuItems = {
   exams: { label: 'Exams', icon: FileText, path: '/exams', roles: [ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.HEAD_TEACHER] },
   results: { label: 'Results', icon: Award, path: '/results', roles: [ROLES.ADMIN, ROLES.TEACHER, ROLES.HEAD_TEACHER] },
   reportCards: { label: 'Report Cards', icon: Bookmark, path: '/report-cards', roles: [ROLES.ADMIN, ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.STUDENT] },
-  resultsApproval: { label: 'Results Approval', icon: CheckCircle, path: '/results-approval', roles: [ROLES.ADMIN, ROLES.HEAD_TEACHER] },
+  resultsApproval: { label: 'Results Approval', icon: CheckCircle, path: '/results-approve', roles: [ROLES.ADMIN, ROLES.HEAD_TEACHER] },
   attendance: { label: 'Attendance', icon: CheckCircle, path: '/attendance', roles: [ROLES.ADMIN, ROLES.TEACHER, ROLES.HEAD_TEACHER] },
   fees: { label: 'Fees', icon: DollarSign, path: '/fees', roles: [ROLES.ADMIN, ROLES.ACCOUNTS, ROLES.HEAD_TEACHER] },
   payments: { label: 'Payments', icon: CreditCard, path: '/payments', roles: [ROLES.ADMIN, ROLES.ACCOUNTS, ROLES.HEAD_TEACHER] },

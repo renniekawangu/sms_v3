@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-function PaymentForm({ payment, fees, onSubmit, onCancel }) {
+function PaymentForm({ payment, fees, students = [], onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     feeId: '',
     amount: '',
@@ -30,6 +30,31 @@ function PaymentForm({ payment, fees, onSubmit, onCancel }) {
       })
     }
   }, [payment])
+
+  const resolveStudentName = (studentRef) => {
+    if (!studentRef) return null
+    if (typeof studentRef === 'string' || typeof studentRef === 'number') {
+      const student = students.find((s) =>
+        String(s._id) === String(studentRef) ||
+        String(s.studentId) === String(studentRef) ||
+        String(s.student_id) === String(studentRef)
+      )
+      if (student) {
+        return [student.firstName, student.lastName].filter(Boolean).join(' ') || student.name || student.email || String(studentRef)
+      }
+      return String(studentRef)
+    }
+    if (studentRef.name) return studentRef.name
+    const firstName = studentRef.firstName || studentRef.first_name
+    const lastName = studentRef.lastName || studentRef.last_name
+    return [firstName, lastName].filter(Boolean).join(' ') || studentRef.studentId || studentRef.student_id || studentRef._id || 'Unknown'
+  }
+
+  const getFeeStudentName = (fee) => {
+    if (!fee) return 'Unknown'
+    const studentData = fee.student || fee.studentId || fee.student_id || fee.studentName
+    return resolveStudentName(studentData) || 'Unknown'
+  }
 
   useEffect(() => {
     if (formData.feeId && fees) {
@@ -110,8 +135,7 @@ function PaymentForm({ payment, fees, onSubmit, onCancel }) {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-text-dark font-semibold">
             Payment for: <span className="text-primary-blue">
-              {selectedFee.studentId?.firstName || selectedFee.studentId?.name || 'Student'}
-              {selectedFee.studentId?.lastName ? ` ${selectedFee.studentId.lastName}` : ''}
+              {getFeeStudentName(selectedFee)}
             </span>
           </p>
         </div>
@@ -137,9 +161,7 @@ function PaymentForm({ payment, fees, onSubmit, onCancel }) {
             const totalAmount = fee.amount || 0
             const amountPaid = fee.amountPaid || 0
             const remaining = totalAmount - amountPaid
-            const studentName = fee.studentId?.firstName 
-              ? `${fee.studentId.firstName}${fee.studentId.lastName ? ` ${fee.studentId.lastName}` : ''}`
-              : fee.studentId?.name || 'Unknown'
+            const studentName = getFeeStudentName(fee)
             const feeDescription = fee.description || 'Fee'
             return (
               <option key={feeId} value={feeId}>

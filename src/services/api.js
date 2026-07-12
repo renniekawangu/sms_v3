@@ -4,7 +4,9 @@ import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, si
 import { jsPDF } from 'jspdf'
 import { auth, db, firebaseConfig } from './firebaseConfig'
 import { ROLES, normalizeRole } from '../config/rbac'
-import { listStudentsForResultsInitialization } from './resultsUtils'
+import { RESULT_STATUSES } from '../config/resultWorkflow'
+import { listStudentsForResultsInitialization, calculateGrade } from './resultsUtils'
+import { normalizeChildCollection, matchesStudentReference, filterRecordsByStudentReference, summarizeFees } from './parentDataUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 export const AUTH_LOGOUT_EVENT = 'auth:logout'
@@ -722,26 +724,110 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return deleteDocument('parents', first)
     }
     if (first === 'dashboard' && method === 'GET') {
-      return { message: 'Parent dashboard is powered by Firestore collections.' }
+      const parentDoc = await getDocumentById('parents', currentUser.uid).catch(() => null)
+      const linkedRefs = parentDoc?.students || []
+      const [linkedStudents, directlyLinkedStudents] = await Promise.all([
+        Promise.all(
+          linkedRefs.map((ref) => {
+            const id = typeof ref === 'object' ? (ref._id || ref.id) : ref
+            return getDocumentById('students', id).catch(() => null)
+          })
+        ),
+        listDocuments('students', { parentId: currentUser.uid }).catch(() => []),
+      ])
+
+      const byId = new Map()
+      ;[...linkedStudents.filter(Boolean), ...directlyLinkedStudents].forEach((student) => {
+        if (student && student._id) {
+          byId.set(student._id, student)
+        }
+      })
+
+      const children = Array.from(byId.values())
+      const studentIds = children.map((child) => child._id).filter(Boolean)
+
+      const [allFees, allAttendance, allResults] = await Promise.all([
+        listDocuments('fees').catch(() => []),
+        listDocuments('attendance').catch(() => []),
+        listDocuments('results').catch(() => []),
+      ])
+
+      const feesFlattened = allFees.filter((fee) => studentIds.some((studentId) => matchesStudentReference(fee, studentId)))
+      const attendanceFlattened = allAttendance.filter((record) => studentIds.some((studentId) => matchesStudentReference(record, studentId)))
+      const resultsFlattened = allResults.filter((result) => studentIds.some((studentId) => matchesStudentReference(result, studentId)))
+
+      const totalFees = feesFlattened.reduce((sum, fee) => sum + (Number(fee.amount) || 0), 0)
+      const totalPaid = feesFlattened.reduce((sum, fee) => sum + (Number(fee.amountPaid ?? fee.paidAmount ?? 0) || 0), 0)
+      const pendingFees = Math.max(0, totalFees - totalPaid)
+
+      const presentCount = attendanceFlattened.filter((record) => String(record.status || '').toLowerCase() === 'present').length
+      const attendanceRate = attendanceFlattened.length > 0 ? Math.round((presentCount / attendanceFlattened.length) * 100) : 0
+
+      const gradePercents = resultsFlattened
+        .map((result) => {
+          if (result.percentage !== undefined && result.percentage !== null && result.percentage !== '') {
+            return Number(result.percentage)
+          }
+          if (result.score !== undefined && result.maxMarks !== undefined && result.maxMarks !== 0) {
+            return (Number(result.score) / Number(result.maxMarks)) * 100
+          }
+          return null
+        })
+        .filter((value) => Number.isFinite(value))
+
+      const averageGrade = gradePercents.length > 0 ? Number((gradePercents.reduce((sum, value) => sum + value, 0) / gradePercents.length).toFixed(1)) : 0
+
+      return {
+        summary: {
+          totalChildren: children.length,
+          totalFees,
+          totalPaid,
+          pendingFees,
+          overdueFees: 0,
+          attendanceRate,
+          averageGrade,
+        },
+        children,
+      }
     }
     if (first === 'children' && second === undefined && method === 'GET') {
-      const profile = await getCurrentUserProfile()
-      return listDocuments('students', { parentId: currentUser.uid })
+      const parentDoc = await getDocumentById('parents', currentUser.uid).catch(() => null)
+      const linkedRefs = parentDoc?.students || []
+      const [linkedStudents, directlyLinkedStudents] = await Promise.all([
+        Promise.all(
+          linkedRefs.map((ref) => {
+            const id = typeof ref === 'object' ? (ref._id || ref.id) : ref
+            return getDocumentById('students', id).catch(() => null)
+          })
+        ),
+        listDocuments('students', { parentId: currentUser.uid }).catch(() => []),
+      ])
+
+      const byId = new Map()
+      ;[...linkedStudents.filter(Boolean), ...directlyLinkedStudents].forEach((student) => {
+        byId.set(student._id, student)
+      })
+      return Array.from(byId.values())
     }
     if (first === 'children' && second && third === 'progress' && method === 'GET') {
-      return listDocuments('results', { studentId: second })
+      const results = await listDocuments('results').catch(() => [])
+      return filterRecordsByStudentReference(results, second)
     }
     if (first === 'children' && second && third === 'grades' && method === 'GET') {
-      return listDocuments('results', { studentId: second })
+      const results = await listDocuments('results').catch(() => [])
+      return filterRecordsByStudentReference(results, second)
     }
     if (first === 'children' && second && third === 'attendance' && method === 'GET') {
-      return listDocuments('attendance', { studentId: second })
+      const attendance = await listDocuments('attendance').catch(() => [])
+      return filterRecordsByStudentReference(attendance, second)
     }
     if (first === 'children' && second && third === 'fees' && method === 'GET') {
-      return listDocuments('fees', { studentId: second })
+      const fees = await listDocuments('fees').catch(() => [])
+      return filterRecordsByStudentReference(fees, second)
     }
     if (first === 'children' && second && third === 'results' && method === 'GET') {
-      return listDocuments('results', { studentId: second })
+      const results = await listDocuments('results').catch(() => [])
+      return filterRecordsByStudentReference(results, second)
     }
     if (first === 'children' && second && third === 'homework' && method === 'GET') {
       return listDocuments('homework', { studentId: second, ...queryParams })
@@ -752,8 +838,21 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (first === 'children' && second && third === 'payments' && method === 'GET') {
       return listDocuments('payments', { studentId: second })
     }
+    if (first === 'children' && second && third === 'payments' && method === 'POST') {
+      const paymentRecord = {
+        studentId: second,
+        ...body,
+      }
+      return createDocument('payments', paymentRecord)
+    }
     if (first === 'children' && second && third === 'payment-history' && method === 'GET') {
       return listDocuments('payments', { studentId: second })
+    }
+    if (first === 'payments' && method === 'POST') {
+      return createDocument('payments', body)
+    }
+    if (first === 'payments' && method === 'GET') {
+      return listDocuments('payments', queryParams)
     }
     if (second === 'link' && third && method === 'POST') {
       const parentRef = doc(db, 'parents', first)
@@ -789,8 +888,8 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   if (resource === 'homework') {
     if (segments.length === 1 && method === 'GET') return listDocuments('homework', queryParams)
     if (segments.length === 2 && method === 'GET') return getDocumentById('homework', first)
-    if (segments.length === 3 && second === 'classroom' && method === 'GET') {
-      return listDocuments('homework', { ...queryParams, classroomId: third })
+    if (segments.length === 3 && first === 'classroom' && method === 'GET') {
+      return listDocuments('homework', { ...queryParams, classroomId: second })
     }
     if (segments.length === 2 && method === 'PUT') return updateDocument('homework', first, body)
     if (segments.length === 1 && method === 'POST') return createDocument('homework', body)
@@ -813,9 +912,15 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       }
 
       const examDoc = await getDocumentById('exams', body.exam)
-      const students = await listStudentsForResultsInitialization(body.classroom, async (collectionName, params) => {
-        return listDocuments(collectionName, params)
-      })
+      const classroomDoc = await getDocumentById('classrooms', body.classroom).catch(() => null)
+      let students = await listStudentsForResultsInitialization(
+        body.classroom,
+        async (collectionName, params) => {
+          return listDocuments(collectionName, params)
+        },
+        classroomDoc
+      )
+
       const subjectIds = Array.isArray(examDoc.subjects) ? examDoc.subjects : []
       const subjects = await Promise.all(subjectIds.map(async (subjectId) => {
         if (typeof subjectId === 'object') return subjectId
@@ -842,7 +947,7 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
             },
             score: null,
             maxMarks: examDoc.totalMarks || 100,
-            status: 'draft',
+            status: RESULT_STATUSES.DRAFT,
             remarks: '',
           })
         } else {
@@ -867,7 +972,7 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
               },
               score: null,
               maxMarks: examDoc.totalMarks || 100,
-              status: 'draft',
+              status: RESULT_STATUSES.DRAFT,
               remarks: '',
             })
           }
@@ -881,8 +986,18 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return createdResults
     }
     if (segments.length === 2) {
-      if (method === 'GET') return getDocumentById('results', first)
-      if (method === 'PUT') return updateDocument('results', first, body)
+      if (method === 'GET' && first !== 'pending') return getDocumentById('results', first)
+      if (method === 'PUT') {
+        // Auto-derive the letter grade whenever a score is being saved and
+        // no explicit grade was provided, so results always stay in sync.
+        let payload = body
+        if (body && body.score !== undefined && body.grade === undefined) {
+          const existing = await getDocumentById('results', first).catch(() => null)
+          const maxMarks = body.maxMarks ?? existing?.maxMarks ?? 100
+          payload = { ...body, grade: calculateGrade(body.score, maxMarks) }
+        }
+        return updateDocument('results', first, payload)
+      }
       if (method === 'DELETE') return deleteDocument('results', first)
     }
     if (segments.length === 3 && first === 'classroom' && method === 'GET') {
@@ -894,21 +1009,35 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
       return listDocuments('results', { classroomId: second, examId: fourth })
     }
-    if (segments.length === 2 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
-      return updateDocument('results', first, { status: second, updatedAt: Timestamp.now() })
+    if (segments.length === 3 && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
+      const nextStatusMap = {
+        submit: RESULT_STATUSES.SUBMITTED,
+        approve: RESULT_STATUSES.APPROVED,
+        publish: RESULT_STATUSES.PUBLISHED,
+      }
+      return updateDocument('results', first, { status: nextStatusMap[second] || second, updatedAt: Timestamp.now() })
     }
-    if (segments.length === 3 && second === 'bulk' && ['submit', 'approve', 'publish'].includes(third) && method === 'POST') {
+    if (segments.length === 3 && second === 'reject' && method === 'POST') {
+      return updateDocument('results', first, { status: RESULT_STATUSES.REJECTED, rejectionReason: body?.reason || '', updatedAt: Timestamp.now() })
+    }
+    if (segments.length === 3 && first === 'bulk' && ['submit', 'approve', 'publish'].includes(second) && method === 'POST') {
+      const nextStatusMap = {
+        submit: RESULT_STATUSES.SUBMITTED,
+        approve: RESULT_STATUSES.APPROVED,
+        publish: RESULT_STATUSES.PUBLISHED,
+      }
       const resultIds = body?.resultIds || []
-      const promises = resultIds.map((id) => updateDocument('results', id, { status: third, updatedAt: Timestamp.now() }))
+      const promises = resultIds.map((id) => updateDocument('results', id, { status: nextStatusMap[second] || second, updatedAt: Timestamp.now() }))
       return Promise.all(promises)
     }
-    if (segments.length === 4 && second === 'exam' && third === 'statistics' && method === 'GET') {
-      const results = await listDocuments('results', { examId: first, ...queryParams })
+    if (segments.length === 4 && first === 'exam' && third === 'statistics' && method === 'GET') {
+      const results = await listDocuments('results', { examId: second, ...queryParams })
       const average = results.reduce((sum, item) => sum + (item.score || 0), 0) / Math.max(results.length, 1)
       return { average, count: results.length }
     }
     if (segments.length === 2 && first === 'pending' && method === 'GET') {
-      return listDocuments('results', { status: 'pending', ...queryParams })
+      const statusFilter = queryParams.status === 'all' ? undefined : queryParams.status || RESULT_STATUSES.SUBMITTED
+      return listDocuments('results', statusFilter ? { status: statusFilter, ...queryParams } : queryParams)
     }
   }
 
@@ -2108,9 +2237,11 @@ export const parentsApi = {
   },
 
   getMyChildren: async () => {
-    return apiCall('/parents/children', {
+    const data = await apiCall('/parents/children', {
       method: 'GET',
-    });
+    })
+
+    return normalizeChildCollection(data)
   },
 
   getChildProgress: async (student_id) => {
@@ -2120,27 +2251,107 @@ export const parentsApi = {
   },
 
   getChildGrades: async (student_id) => {
-    return apiCall(`/parents/children/${student_id}/grades`, {
-      method: 'GET',
-    });
+    try {
+      const data = await apiCall(`/parents/children/${student_id}/grades`, {
+        method: 'GET',
+      })
+
+      const normalized = normalizeChildCollection(data)
+      if (normalized.length > 0) return normalized
+    } catch (error) {
+      console.warn('Parent grades endpoint failed, falling back to results data:', error)
+    }
+
+    try {
+      const results = await listDocuments('results').catch(() => [])
+      return filterRecordsByStudentReference(results, student_id)
+    } catch (error) {
+      console.warn('Parent grades fallback failed:', error)
+      return []
+    }
   },
 
   getChildAttendance: async (student_id) => {
-    return apiCall(`/parents/children/${student_id}/attendance`, {
-      method: 'GET',
-    });
+    try {
+      const data = await apiCall(`/parents/children/${student_id}/attendance`, {
+        method: 'GET',
+      })
+
+      const normalized = normalizeChildCollection(data)
+      if (normalized.length > 0) return normalized
+    } catch (error) {
+      console.warn('Parent attendance endpoint failed, falling back to attendance data:', error)
+    }
+
+    try {
+      const records = await attendanceApi.list()
+      return records.filter((record) => matchesStudentReference(record, student_id))
+    } catch (error) {
+      console.warn('Parent attendance fallback failed:', error)
+      return []
+    }
   },
 
   getChildFees: async (student_id) => {
-    return apiCall(`/parents/children/${student_id}/fees`, {
-      method: 'GET',
-    });
+    try {
+      const data = await apiCall(`/parents/children/${student_id}/fees`, {
+        method: 'GET',
+      })
+
+      const normalized = normalizeChildCollection(data)
+      if (normalized.length > 0) {
+        const payments = await paymentsApi.list().catch(() => [])
+        const summary = summarizeFees(normalized, payments)
+        return {
+          summary,
+          fees: normalized,
+        }
+      }
+    } catch (error) {
+      console.warn('Parent fees endpoint failed, falling back to fee data:', error)
+    }
+
+    try {
+      const [fees, payments] = await Promise.all([
+        feesApi.list(),
+        paymentsApi.list(),
+      ])
+      const matchingFees = fees.filter((fee) => matchesStudentReference(fee, student_id))
+
+      if (matchingFees.length > 0) {
+        const summary = summarizeFees(matchingFees, payments)
+
+        return {
+          summary,
+          fees: matchingFees,
+        }
+      }
+    } catch (error) {
+      console.warn('Parent fee fallback failed:', error)
+    }
+
+    return []
   },
 
   getChildResults: async (student_id) => {
-    return apiCall(`/parents/children/${student_id}/results`, {
-      method: 'GET',
-    });
+    try {
+      const data = await apiCall(`/parents/children/${student_id}/results`, {
+        method: 'GET',
+      })
+
+      const normalized = normalizeChildCollection(data)
+      if (normalized.length > 0) return normalized
+    } catch (error) {
+      console.warn('Parent results endpoint failed, falling back to results data:', error)
+    }
+
+    try {
+      const results = await listDocuments('results').catch(() => [])
+      return filterRecordsByStudentReference(results, student_id)
+    } catch (error) {
+      console.warn('Parent results fallback failed:', error)
+      return []
+    }
   },
 
   getChildHomework: async (student_id, academicYear) => {

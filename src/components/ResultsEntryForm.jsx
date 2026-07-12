@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { resultApi } from '../services/api';
+import { calculateGrade } from '../services/resultsUtils';
 
 export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroomId, examId, results = [] }) {
   const [formData, setFormData] = useState({});
@@ -45,9 +46,11 @@ export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroom
         const resultId = result._id || result.studentId;
         const data = formData[resultId];
         if (data?.score !== '') {
+          const numericScore = parseFloat(data.score);
           await resultApi.update(result._id, {
-            score: parseFloat(data.score),
+            score: numericScore,
             remarks: data.remarks,
+            grade: calculateGrade(numericScore, result.maxMarks),
           });
         }
       }
@@ -91,6 +94,7 @@ export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroom
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">Student</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700">Subject</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">Score</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-700">Remarks</th>
                 </tr>
@@ -111,6 +115,10 @@ export default function ResultsEntryForm({ isOpen, onClose, onSuccess, classroom
                           <div className="font-medium">{studentName}</div>
                           <div className="text-xs text-gray-500">ID: {studentId}</div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">
+                        <div className="font-medium">{result.subject?.name || 'General'}</div>
+                        {result.subject?.code && <div className="text-xs text-gray-500">{result.subject.code}</div>}
                       </td>
                       <td className="px-4 py-3">
                         <input

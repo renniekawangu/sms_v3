@@ -5,6 +5,12 @@ import { resultApi, examApi, classroomApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { ROLES, normalizeRole } from '../config/rbac'
+import {
+  RESULT_STATUS_FILTER_OPTIONS,
+  getResultStatusMeta,
+  getResultTransition,
+  normalizeResultStatus,
+} from '../config/resultWorkflow'
 import ResultsEntryForm from '../components/ResultsEntryForm'
 import PageHeader from '../components/PageHeader'
 
@@ -113,33 +119,20 @@ function Results() {
   }
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'draft': return 'bg-gray-100 text-gray-700'
-      case 'submitted': return 'bg-cyan-100 text-cyan-700'
-      case 'approved': return 'bg-green-100 text-green-700'
-      case 'published': return 'bg-purple-100 text-purple-700'
-      case 'rejected': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-700'
-    }
+    return getResultStatusMeta(status).badgeClass
   }
 
   const handleStatusTransition = async (resultId, currentStatus) => {
-    const endpoints = {
-      'draft': 'submit',
-      'submitted': 'approve',
-      'approved': 'publish'
-    }
-
-    const endpoint = endpoints[currentStatus]
-    if (!endpoint) return
+    const transition = getResultTransition(currentStatus)
+    if (!transition) return
 
     try {
       setTransitioningId(resultId)
-      await resultApi[endpoint](resultId)
-      showSuccess(`Result ${endpoint}ed successfully`)
+      await resultApi[transition.action](resultId)
+      showSuccess(`Result ${transition.actionLabel} successfully`)
       handleLoadResults()
     } catch (err) {
-      showError(err.message || `Failed to ${endpoint} result`)
+      showError(err.message || `Failed to ${transition.action} result`)
     } finally {
       setTransitioningId(null)
     }
@@ -220,7 +213,7 @@ function Results() {
   }
 
   const filteredResults = results
-    .filter(result => !statusFilter || result.status === statusFilter)
+    .filter(result => !statusFilter || normalizeResultStatus(result.status) === statusFilter)
     .filter(result => !subjectFilter || result.subject?.name === subjectFilter)
 
   return (
@@ -313,11 +306,11 @@ function Results() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="ui-select"
                 >
-                  <option value="">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
-                  <option value="published">Published</option>
+                  {RESULT_STATUS_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value || 'all'} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -347,7 +340,7 @@ function Results() {
             <p className="text-sm text-cyan-900 mb-3 font-medium">{selectedResults.size} result(s) selected</p>
             <div className="flex flex-wrap gap-2">
               {/* Submit All button for draft results */}
-              {Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'draft') && (
+              {Array.from(selectedResults).some(id => normalizeResultStatus(results.find(r => r._id === id)?.status) === 'draft') && (
                 <button
                   onClick={() => handleBulkAction('bulkSubmit')}
                   disabled={bulkProcessing}
@@ -358,7 +351,7 @@ function Results() {
                 </button>
               )}
               {/* Approve All button for submitted results */}
-              {(normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'submitted') && (
+              {(normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && Array.from(selectedResults).some(id => normalizeResultStatus(results.find(r => r._id === id)?.status) === 'submitted') && (
                 <button
                   onClick={() => handleBulkAction('bulkApprove')}
                   disabled={bulkProcessing}
@@ -369,7 +362,7 @@ function Results() {
                 </button>
               )}
               {/* Publish All button for approved results */}
-              {(normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && Array.from(selectedResults).some(id => results.find(r => r._id === id)?.status === 'approved') && (
+              {(normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && Array.from(selectedResults).some(id => normalizeResultStatus(results.find(r => r._id === id)?.status) === 'approved') && (
                 <button
                   onClick={() => handleBulkAction('bulkPublish')}
                   disabled={bulkProcessing}
@@ -435,68 +428,72 @@ function Results() {
                 </tr>
               </thead>
               <tbody>
-                {filteredResults.map(result => (
-                  <tr key={result._id} className="border-b hover:bg-cyan-50/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedResults.has(result._id)}
-                        onChange={() => toggleResultSelection(result._id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text-dark">
-                      {result.student?.name} ({result.student?.studentId})
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text-dark">
-                      {result.subject?.name}
-                      {result.subject?.code && <span className="text-text-muted ml-1">({result.subject.code})</span>}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-text-dark">
-                      {result.score}/{result.maxMarks}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-text-dark">
-                      {result.grade}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(result.status)}`}>
-                        {result.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {result.status === 'draft' && (
-                        <button
-                          onClick={() => handleStatusTransition(result._id, 'draft')}
-                          disabled={transitioningId === result._id}
-                          className="text-cyan-700 hover:text-cyan-600 flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <Send size={16} />
-                          Submit
-                        </button>
-                      )}
-                      {result.status === 'submitted' && (normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && (
-                        <button
-                          onClick={() => handleStatusTransition(result._id, 'submitted')}
-                          disabled={transitioningId === result._id}
-                          className="text-green-600 hover:text-opacity-80 flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <Check size={16} />
-                          Approve
-                        </button>
-                      )}
-                      {result.status === 'approved' && (normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && (
-                        <button
-                          onClick={() => handleStatusTransition(result._id, 'approved')}
-                          disabled={transitioningId === result._id}
-                          className="text-purple-600 hover:text-opacity-80 flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <CheckCircle size={16} />
-                          Publish
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {filteredResults.map((result) => {
+                  const normalizedStatus = normalizeResultStatus(result.status)
+
+                  return (
+                    <tr key={result._id} className="border-b hover:bg-cyan-50/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedResults.has(result._id)}
+                          onChange={() => toggleResultSelection(result._id)}
+                          className="w-4 h-4"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-dark">
+                        {result.student?.name} ({result.student?.studentId})
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-dark">
+                        {result.subject?.name}
+                        {result.subject?.code && <span className="text-text-muted ml-1">({result.subject.code})</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-text-dark">
+                        {result.score}/{result.maxMarks}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-text-dark">
+                        {result.grade}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(normalizedStatus)}`}>
+                          {getResultStatusMeta(normalizedStatus).label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {normalizedStatus === 'draft' && (
+                          <button
+                            onClick={() => handleStatusTransition(result._id, 'draft')}
+                            disabled={transitioningId === result._id}
+                            className="text-cyan-700 hover:text-cyan-600 flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <Send size={16} />
+                            Submit
+                          </button>
+                        )}
+                        {normalizedStatus === 'submitted' && (normalizedUserRole === ROLES.HEAD_TEACHER || normalizedUserRole === ROLES.ADMIN) && (
+                          <button
+                            onClick={() => handleStatusTransition(result._id, 'submitted')}
+                            disabled={transitioningId === result._id}
+                            className="text-green-600 hover:text-opacity-80 flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <Check size={16} />
+                            Approve
+                          </button>
+                        )}
+                        {normalizedStatus === 'approved' && (normalizedUserRole === ROLES.ADMIN || normalizedUserRole === ROLES.HEAD_TEACHER) && (
+                          <button
+                            onClick={() => handleStatusTransition(result._id, 'approved')}
+                            disabled={transitioningId === result._id}
+                            className="text-purple-600 hover:text-opacity-80 flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <CheckCircle size={16} />
+                            Publish
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

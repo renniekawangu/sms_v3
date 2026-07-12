@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Download, BookOpen, CheckCircle, DollarSign, Calendar, User, AlertCircle, Loader, TrendingUp, FileText, RefreshCw, Award } from 'lucide-react'
 import { parentsApi } from '../services/api'
+import { getNumericPercentage, summarizeFees } from '../services/parentDataUtils'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
 import ChildHomework from '../components/ChildHomework'
@@ -55,18 +56,21 @@ function ChildDetail() {
         })
       ])
 
-      console.log('Grades:', gradesData)
-      console.log('Attendance:', attendanceData)
-      console.log('Fees:', feesData)
-      console.log('Results:', resultsData)
+      const normalizedGrades = Array.isArray(gradesData) && gradesData.length > 0
+        ? gradesData
+        : Array.isArray(resultsData) && resultsData.length > 0
+          ? resultsData
+          : []
+      const normalizedAttendance = Array.isArray(attendanceData) ? attendanceData : []
+      const normalizedFees = Array.isArray(feesData) ? feesData : feesData || []
 
-      setGrades(resultsData || [])
-      setAttendance(attendanceData || [])
-      setFees(feesData || [])
+      setGrades(normalizedGrades)
+      setAttendance(normalizedAttendance)
+      setFees(normalizedFees)
 
-      // Get child basic info
-      const dashboard = await parentsApi.getDashboard()
-      const childData = dashboard.children?.find(c => c._id === id)
+      // Get child basic info from linked children
+      const childrenList = await parentsApi.getMyChildren()
+      const childData = childrenList?.find(c => c._id === id)
       if (childData) {
         setChild(childData)
       }
@@ -137,43 +141,44 @@ function ChildDetail() {
 
   const calculateAttendancePercentage = () => {
     if (attendance.length === 0) return 0
-    const present = attendance.filter(a => a.status === 'present').length
+    const present = attendance.filter((a) => String(a.status || '').trim().toLowerCase() === 'present').length
     return Math.round((present / attendance.length) * 100)
   }
 
   const calculateAverageGrade = () => {
     if (grades.length === 0) return 'N/A'
-    
-    // Handle exam results format (from /results endpoint)
-    if (grades[0]?.overallGrade !== undefined || grades[0]?.percentage !== undefined) {
-      const total = grades.reduce((sum, result) => {
-        // Use percentage if available, or try to convert grade to numeric
-        const value = result.percentage || 
-                     (result.overallGrade ? gradeToNumber(result.overallGrade) : 0)
-        return sum + value
-      }, 0)
-      const average = total / grades.length
-      return isNaN(average) ? 'N/A' : average.toFixed(2)
-    }
-    
-    // Handle legacy grades format
-    const total = grades.reduce((sum, g) => {
-      // Try to get grade in order of preference: finalGrade > grade > endTermGrade > midTermGrade
-      const gradeValue = g.finalGrade || g.grade || g.endTermGrade || g.midTermGrade || 0
-      return sum + gradeValue
+
+    const totals = grades.reduce((sum, result) => {
+      const percentage = getNumericPercentage(result)
+      return sum + (Number.isFinite(percentage) ? percentage : 0)
     }, 0)
-    const average = total / grades.length
-    return isNaN(average) ? 'N/A' : average.toFixed(2)
+
+    const average = totals / grades.length
+    return Number.isFinite(average) ? average.toFixed(2) : 'N/A'
   }
 
-  const gradeToNumber = (grade) => {
-    const gradeMap = { 'A+': 95, 'A': 90, 'B+': 85, 'B': 80, 'C+': 75, 'C': 70, 'D': 60, 'F': 0 }
-    return gradeMap[grade] || 0
+  const getResultDisplayGrade = (result) => {
+    const grade = result.overallGrade || result.grade || result.finalGrade || result.endTermGrade || result.midTermGrade
+    if (grade) return grade
+    const percentage = getNumericPercentage(result)
+    return Number.isFinite(percentage) ? `${Math.round(percentage)}%` : 'N/A'
+  }
+
+  const getResultPercentage = (result) => {
+    const percentage = getNumericPercentage(result)
+    return Number.isFinite(percentage) ? `${Math.round(percentage)}%` : '-'
   }
 
   const getGradeColor = (grade) => {
-    if (!grade) return 'text-gray-500'
-    const gradeStr = String(grade).toUpperCase()
+    if (grade === undefined || grade === null || grade === '') return 'text-gray-500'
+    const gradeStr = String(grade).trim().toUpperCase()
+    const numeric = Number(gradeStr.replace('%', ''))
+    if (Number.isFinite(numeric)) {
+      if (numeric >= 80) return 'text-green-600'
+      if (numeric >= 60) return 'text-primary-blue'
+      if (numeric >= 40) return 'text-yellow-600'
+      return 'text-red-600'
+    }
     if (gradeStr.startsWith('A')) return 'text-green-600'
     if (gradeStr.startsWith('B')) return 'text-primary-blue'
     if (gradeStr.startsWith('C')) return 'text-yellow-600'
@@ -183,8 +188,15 @@ function ChildDetail() {
   }
 
   const getGradeBgColor = (grade) => {
-    if (!grade) return 'bg-gray-50'
-    const gradeStr = String(grade).toUpperCase()
+    if (grade === undefined || grade === null || grade === '') return 'bg-gray-50'
+    const gradeStr = String(grade).trim().toUpperCase()
+    const numeric = Number(gradeStr.replace('%', ''))
+    if (Number.isFinite(numeric)) {
+      if (numeric >= 80) return 'bg-green-50 border-green-200'
+      if (numeric >= 60) return 'bg-cyan-50 border-cyan-200'
+      if (numeric >= 40) return 'bg-yellow-50 border-yellow-200'
+      return 'bg-red-50 border-red-200'
+    }
     if (gradeStr.startsWith('A')) return 'bg-green-50 border-green-200'
     if (gradeStr.startsWith('B')) return 'bg-cyan-50 border-cyan-200'
     if (gradeStr.startsWith('C')) return 'bg-yellow-50 border-yellow-200'
@@ -194,20 +206,18 @@ function ChildDetail() {
   }
 
   const calculateFeesStatus = () => {
-    // Use summary data from the backend which is already calculated
     if (fees && fees.summary) {
       const { totalFees, totalPaid, pendingFees } = fees.summary
       const percentage = totalFees > 0 ? Math.round((totalPaid / totalFees) * 100) : 0
       return {
         paid: totalPaid,
         pending: pendingFees,
-        percentage
+        percentage,
       }
     }
 
-    // Fallback: handle legacy format or direct array
     let feesList = []
-    
+
     if (Array.isArray(fees)) {
       feesList = fees
     } else if (fees && typeof fees === 'object' && fees.fees && Array.isArray(fees.fees)) {
@@ -218,14 +228,13 @@ function ChildDetail() {
       return { paid: 0, pending: 0, percentage: 0 }
     }
 
-    const totalAmount = feesList.reduce((sum, f) => sum + (f.amount || 0), 0)
-    const paidAmount = feesList.reduce((sum, f) => sum + (f.amountPaid || 0), 0)
-    const percentage = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0
-    
+    const summary = summarizeFees(feesList, [])
+    const percentage = summary.totalFees > 0 ? Math.round((summary.totalPaid / summary.totalFees) * 100) : 0
+
     return {
-      paid: paidAmount,
-      pending: totalAmount - paidAmount,
-      percentage
+      paid: summary.totalPaid,
+      pending: summary.pendingFees,
+      percentage,
     }
   }
 
@@ -375,17 +384,21 @@ function ChildDetail() {
                         <div className="space-y-3">
                           <div className="overflow-x-auto">
                             <div className="flex gap-2 pb-2 min-w-max lg:min-w-full lg:flex-wrap">
-                              {grades.slice(0, 4).map((result, idx) => (
-                                <div key={idx} className={`flex-shrink-0 lg:flex-shrink min-w-max lg:min-w-0 lg:flex-1 ${getGradeBgColor(result.overallGrade)} border-2 rounded-lg p-3 text-center hover:shadow-md transition`}>
-                                  <p className="text-xs font-semibold text-text-muted truncate mb-1">
-                                    {result.exam?.name || 'Exam'}
-                                  </p>
-                                  <p className={`text-2xl font-bold ${getGradeColor(result.overallGrade)}`}>
-                                    {result.overallGrade || 'N/A'}
-                                  </p>
-                                  <p className="text-xs text-text-muted mt-1">{result.percentage}%</p>
-                                </div>
-                              ))}
+                              {grades.slice(0, 4).map((result, idx) => {
+                                const displayGrade = getResultDisplayGrade(result)
+                                const displayPercentage = getResultPercentage(result)
+                                return (
+                                  <div key={idx} className={`flex-shrink-0 lg:flex-shrink min-w-max lg:min-w-0 lg:flex-1 ${getGradeBgColor(displayGrade)} border-2 rounded-lg p-3 text-center hover:shadow-md transition`}>
+                                    <p className="text-xs font-semibold text-text-muted truncate mb-1">
+                                      {result.exam?.name || 'Exam'}
+                                    </p>
+                                    <p className={`text-2xl font-bold ${getGradeColor(displayGrade)}`}>
+                                      {displayGrade}
+                                    </p>
+                                    <p className="text-xs text-text-muted mt-1">{displayPercentage}</p>
+                                  </div>
+                                )
+                              })}
                               {grades.length > 4 && (
                                 <div className="flex-shrink-0 lg:flex-shrink min-w-max lg:min-w-0 lg:flex-1 bg-gradient-to-br from-cyan-100 to-cyan-50 border-2 border-cyan-300 rounded-lg p-3 text-center">
                                   <p className="text-xs font-semibold text-cyan-700 mb-1">Average</p>
@@ -562,9 +575,14 @@ function ChildDetail() {
                                   {grades
                                     .filter(g => g.exam?.academicYear === selectedAcademicYear && g.exam?.term === selectedTerm)
                                     .map((result, idx) => {
-                                      const percentage = result.exam?.totalMarks ? Math.round((result.score / result.exam.totalMarks) * 100) : 0;
-                                      const gradeColor = percentage >= 80 ? 'text-green-600 bg-green-50' : percentage >= 60 ? 'text-primary-blue bg-cyan-50' : percentage >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
-                                      
+                                      const rawScore = Number(result.score ?? result.marks ?? result.points ?? 0)
+                                      const maxScore = Number(result.maxMarks ?? result.exam?.totalMarks ?? result.exam?.maximumMarks ?? 0)
+                                      const percentage = Number.isFinite(rawScore) && Number.isFinite(maxScore) && maxScore > 0
+                                        ? Math.round((rawScore / maxScore) * 100)
+                                        : (Number.isFinite(getNumericPercentage(result)) ? Math.round(getNumericPercentage(result)) : 0)
+                                      const gradeColor = percentage >= 80 ? 'text-green-600 bg-green-50' : percentage >= 60 ? 'text-primary-blue bg-cyan-50' : percentage >= 40 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50'
+                                      const gradeLabel = result.grade || result.overallGrade || result.finalGrade || result.endTermGrade || result.midTermGrade || (percentage > 0 ? (percentage >= 80 ? 'A' : percentage >= 60 ? 'B' : percentage >= 40 ? 'C' : 'D') : 'N/A')
+
                                       return (
                                         <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
                                           <td className="px-4 py-3 text-sm text-text-dark font-medium">
@@ -580,15 +598,15 @@ function ChildDetail() {
                                             {result.subject?.code && <span className="text-text-muted ml-1">({result.subject.code})</span>}
                                           </td>
                                           <td className="px-4 py-3 text-sm font-medium text-text-dark">
-                                            {result.score}/{result.exam?.totalMarks || 100}
+                                            {rawScore}{maxScore ? `/${maxScore}` : ''}
                                           </td>
                                           <td className="px-4 py-3 text-sm font-medium text-center">
                                             <span className={`inline-block px-3 py-1 rounded-full font-semibold ${gradeColor}`}>
-                                              {percentage}%
+                                              {percentage > 0 ? `${percentage}%` : '-'}
                                             </span>
                                           </td>
                                           <td className="px-4 py-3 text-sm font-medium text-text-dark">
-                                            {percentage >= 80 ? 'A' : percentage >= 60 ? 'B' : percentage >= 40 ? 'C' : 'D'}
+                                            {gradeLabel}
                                           </td>
                                           <td className="px-4 py-3 text-sm text-text-muted">
                                             {result.remarks || '-'}

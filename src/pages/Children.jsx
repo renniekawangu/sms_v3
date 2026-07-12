@@ -22,8 +22,8 @@ function Children() {
   const loadChildren = async () => {
     try {
       setLoading(true)
-      const dashboard = await parentsApi.getDashboard()
-      setChildren(dashboard.children || [])
+      const childrenList = await parentsApi.getMyChildren()
+      setChildren(childrenList || [])
     } catch (err) {
       const errorMessage = err.message || 'Failed to load children'
       showError(errorMessage)

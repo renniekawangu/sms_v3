@@ -4,6 +4,7 @@ import { resultApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
 import { ROLES } from '../config/rbac'
+import { RESULT_STATUS_FILTER_OPTIONS, RESULT_STATUSES, getResultStatusMeta, normalizeResultStatus } from '../config/resultWorkflow'
 
 function ResultsApproval() {
   const { user } = useAuth()
@@ -15,7 +16,7 @@ function ResultsApproval() {
   const [showApprovalForm, setShowApprovalForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [filter, setFilter] = useState({
-    status: 'submitted'
+    status: RESULT_STATUSES.SUBMITTED
   })
 
   useEffect(() => {
@@ -26,7 +27,8 @@ function ResultsApproval() {
     try {
       setLoading(true)
       const data = await resultApi.getPending(filter)
-      setResults(data.results || [])
+      const resultsList = Array.isArray(data) ? data : data.results || []
+      setResults(resultsList)
     } catch (err) {
       showError(err.message || 'Failed to load pending results')
     } finally {
@@ -75,14 +77,13 @@ function ResultsApproval() {
   }
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'submitted': return 'bg-blue-100 text-blue-700'
-      case 'approved': return 'bg-yellow-100 text-yellow-700'
-      case 'published': return 'bg-green-100 text-green-700'
-      case 'rejected': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-700'
-    }
+    return getResultStatusMeta(status).approvalBadgeClass
   }
+
+  const normalizedResults = results.map((result) => ({
+    ...result,
+    normalizedStatus: normalizeResultStatus(result.status),
+  }))
 
   if (loading) {
     return (
@@ -108,10 +109,11 @@ function ResultsApproval() {
             onChange={(e) => setFilter({ ...filter, status: e.target.value })}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-blue"
           >
-            <option value="submitted">Pending Approval</option>
-            <option value="approved">Approved (Not Published)</option>
-            <option value="published">Published</option>
-            <option value="rejected">Rejected</option>
+            {RESULT_STATUS_FILTER_OPTIONS.filter((option) => option.value !== '').map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -122,12 +124,12 @@ function ResultsApproval() {
           <AlertCircle size={48} className="mx-auto text-text-muted mb-4" />
           <p className="text-text-muted text-lg">No results to review</p>
           <p className="text-sm text-text-muted mt-2">
-            {filter.status === 'submitted' ? 'All results are up to date!' : 'No results found with this status'}
+            {filter.status === RESULT_STATUSES.SUBMITTED ? 'All results are up to date!' : 'No results found with this status'}
           </p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {results.map(result => (
+          {normalizedResults.map((result) => (
             <div
               key={result._id}
               className="bg-card-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -139,8 +141,8 @@ function ResultsApproval() {
                     <h3 className="text-lg font-semibold text-text-dark">
                       {result.student?.name}
                     </h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(result.status)}`}>
-                      {result.status}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(result.normalizedStatus)}`}>
+                      {getResultStatusMeta(result.normalizedStatus).label}
                     </span>
                   </div>
 
@@ -255,7 +257,7 @@ function ResultsApproval() {
             {/* Action Form */}
             {!showApprovalForm ? (
               <div className="flex gap-3">
-                {selectedResult.status === 'submitted' && (
+                {selectedResult.normalizedStatus === RESULT_STATUSES.SUBMITTED && (
                   <>
                     <button
                       onClick={() => handleApprove(selectedResult._id)}

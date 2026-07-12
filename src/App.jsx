@@ -292,6 +292,10 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/results-approve"
+                element={<Navigate replace to="/results-approval" />}
+              />
 
               {/* Fees - ACCOUNTS, HEAD_TEACHER & ADMIN */}
               <Route

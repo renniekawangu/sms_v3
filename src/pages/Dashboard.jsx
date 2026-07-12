@@ -170,8 +170,45 @@ function ParentDashboard() {
     try {
       setError(null)
       const data = await parentsApi.getDashboard()
-      console.log('Parent dashboard API response:', data)
-      setDashboardData(data)
+      const children = Array.isArray(data?.children) ? data.children : []
+      let enrichedSummary = data?.summary || {}
+
+      if (children.length > 0) {
+        const feeSummaries = await Promise.all(children.map(async (child) => {
+          try {
+            const childFees = await parentsApi.getChildFees(child._id)
+            if (childFees?.summary) {
+              return childFees.summary
+            }
+            if (Array.isArray(childFees)) {
+              const totalFees = childFees.reduce((sum, fee) => sum + Number(fee.amount || 0), 0)
+              const totalPaid = childFees.reduce((sum, fee) => sum + Number(fee.amountPaid || fee.paidAmount || fee.totalPaid || 0), 0)
+              return { totalFees, totalPaid, pendingFees: Math.max(totalFees - totalPaid, 0) }
+            }
+            return {}
+          } catch {
+            return {}
+          }
+        }))
+
+        const totalFees = feeSummaries.reduce((sum, item) => sum + Number(item.totalFees || 0), 0)
+        const totalPaid = feeSummaries.reduce((sum, item) => sum + Number(item.totalPaid || 0), 0)
+        const pendingFees = Math.max(totalFees - totalPaid, 0)
+
+        if (!data?.summary || (Number(data.summary.totalFees || 0) === 0 && Number(data.summary.totalPaid || 0) === 0 && Number(data.summary.pendingFees || 0) === 0)) {
+          enrichedSummary = {
+            ...enrichedSummary,
+            totalFees,
+            totalPaid,
+            pendingFees,
+          }
+        }
+      }
+
+      setDashboardData({
+        ...data,
+        summary: enrichedSummary,
+      })
     } catch (error) {
       console.error('Error loading parent dashboard:', error)
       setError(error.message || 'Failed to load parent dashboard')
@@ -272,6 +309,16 @@ function ParentDashboard() {
           </div>
           <p className="text-2xl sm:text-3xl font-semibold text-purple-600">{(summary?.attendanceRate || 0).toFixed(1)}%</p>
           <p className="text-xs sm:text-sm text-text-muted mt-2">Overall rate</p>
+        </div>
+
+        {/* Average Grade Card */}
+        <div className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 border-t-4 border-t-indigo-500">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs sm:text-sm text-text-muted font-medium">Average Grade</p>
+            <Award className="text-indigo-500" size={24} />
+          </div>
+          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">{summary?.averageGrade ? `${summary.averageGrade}%` : 'N/A'}</p>
+          <p className="text-xs sm:text-sm text-text-muted mt-2">Across exams</p>
         </div>
       </div>
 
