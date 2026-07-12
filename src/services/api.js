@@ -869,7 +869,40 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
   // Classroom endpoints
   if (resource === 'classrooms' && method === 'GET') {
     if (segments.length === 1) return listDocuments('classrooms', queryParams)
-    if (segments.length === 2) return getDocumentById('classrooms', first)
+    if (segments.length === 2) {
+      const classroom = await getDocumentById('classrooms', first)
+      const studentIds = Array.isArray(classroom.students) ? classroom.students : []
+      const students = await listDocuments('students').catch(() => [])
+
+      const normalizedStudents = students.filter((student) => {
+        const studentId = student._id || student.id || student.student_id || student.studentId
+        const classroomIdValues = [
+          student.classroomId,
+          student.classroom_id,
+          student.classroom,
+          student.classroomName,
+          student.classroomNameId,
+        ]
+
+        const matchesByAssignedId = studentIds.some((assignedId) => String(assignedId) === String(studentId))
+        const matchesByClassroomText = classroomIdValues.some((value) => {
+          if (!value) return false
+          const normalizedValue = String(value).trim().toLowerCase()
+          const normalizedClassroom = [classroom.grade, classroom.section].filter(Boolean).join(' ').trim().toLowerCase()
+          return normalizedValue.includes(normalizedClassroom) || normalizedClassroom.includes(normalizedValue)
+        })
+
+        return matchesByAssignedId || matchesByClassroomText
+      })
+
+      return {
+        ...classroom,
+        students: normalizedStudents.map((student) => ({
+          ...student,
+          name: student.name || [student.firstName, student.lastName].filter(Boolean).join(' ').trim() || 'Student',
+        })),
+      }
+    }
   }
 
   // Exam endpoints
