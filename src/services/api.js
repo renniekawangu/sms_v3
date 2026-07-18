@@ -1166,7 +1166,16 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       return listDocuments('results', { classroomId: second, examId: queryParams.examId })
     }
     if (segments.length === 3 && first === 'student' && method === 'GET') {
-      return listDocuments('results', { studentId: second, ...queryParams })
+      const results = await listDocuments('results').catch(() => [])
+      return results.filter((result) => {
+        if (!matchesStudentReference(result, second)) return false
+
+        if (queryParams.status && String(result.status || '') !== String(queryParams.status)) return false
+        if (queryParams.examId && String(result.examId || '') !== String(queryParams.examId)) return false
+        if (queryParams.classroomId && String(result.classroomId || '') !== String(queryParams.classroomId)) return false
+
+        return true
+      })
     }
     if (segments.length === 5 && first === 'classroom' && third === 'exam' && method === 'GET') {
       return listDocuments('results', { classroomId: second, examId: fourth })
@@ -2302,14 +2311,23 @@ const normalizeAttendanceRecord = (record) => {
 
 const normalizeResultRecord = (record) => {
   if (!record) return null
+  const score = record.score ?? record.marks ?? 0
+  const maxMarks = record.maxMarks ?? record.totalMarks ?? 100
   return {
     _id: record._id || record.id,
     subject: record.subject?.name || record.subjectName || 'Subject',
+    subjectCode: record.subject?.code || record.subjectCode || '',
     exam: record.exam?.name || record.examName || 'Exam',
-    score: record.score || record.marks || 0,
-    maxMarks: record.maxMarks || record.totalMarks || 100,
+    examType: record.exam?.type || record.examType || '',
+    examYear: record.exam?.academicYear || record.examYear || record.academicYear || '',
+    examTerm: record.exam?.term || record.term || '',
+    score,
+    maxMarks,
     grade: record.grade || 'N/A',
-    remarks: record.remarks || ''
+    remarks: record.remarks || '',
+    percentage: Number.isFinite(score) && Number.isFinite(maxMarks) && maxMarks > 0
+      ? Math.round((Number(score) / Number(maxMarks)) * 100)
+      : record.percentage ?? record.percent ?? null,
   }
 }
 

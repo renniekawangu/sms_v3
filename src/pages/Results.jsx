@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Upload, Eye, AlertCircle, Loader, CheckCircle, Send, Check, Download } from 'lucide-react'
+import { Plus, Upload, Eye, AlertCircle, Loader, CheckCircle, Send, Check, Download, BookOpen } from 'lucide-react'
 import { resultApi, examApi, classroomApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,6 +11,7 @@ import {
   getResultTransition,
   normalizeResultStatus,
 } from '../config/resultWorkflow'
+import { getNumericPercentage } from '../services/parentDataUtils'
 import ResultsEntryForm from '../components/ResultsEntryForm'
 import PageHeader from '../components/PageHeader'
 
@@ -34,6 +35,8 @@ function Results() {
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
+  const [selectedTerm, setSelectedTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
@@ -144,6 +147,29 @@ function Results() {
     return getResultStatusMeta(status).badgeClass
   }
 
+  useEffect(() => {
+    if (!isStudentView || results.length === 0) return
+
+    const years = Array.from(new Set(results.map((result) => result.examYear).filter(Boolean))).sort().reverse()
+    if (years.length > 0 && !selectedAcademicYear) {
+      setSelectedAcademicYear(years[0])
+    }
+  }, [isStudentView, results, selectedAcademicYear])
+
+  useEffect(() => {
+    if (!isStudentView || !selectedAcademicYear) return
+
+    const terms = Array.from(new Set(
+      results
+        .filter((result) => result.examYear === selectedAcademicYear)
+        .map((result) => result.examTerm)
+        .filter(Boolean)
+    )).sort()
+    if (terms.length > 0 && !selectedTerm) {
+      setSelectedTerm(terms[0])
+    }
+  }, [isStudentView, selectedAcademicYear, results, selectedTerm])
+
   const handleStatusTransition = async (resultId, currentStatus) => {
     const transition = getResultTransition(currentStatus)
     if (!transition) return
@@ -238,6 +264,135 @@ function Results() {
     .filter(result => !statusFilter || normalizeResultStatus(result.status) === statusFilter)
     .filter(result => !subjectFilter || result.subject?.name === subjectFilter)
 
+  const academicYears = Array.from(new Set(results.map((result) => result.examYear).filter(Boolean))).sort().reverse()
+  const termOptions = selectedAcademicYear
+    ? Array.from(new Set(
+        results
+          .filter((result) => result.examYear === selectedAcademicYear)
+          .map((result) => result.examTerm)
+          .filter(Boolean)
+      )).sort()
+    : []
+  const studentResults = selectedAcademicYear && selectedTerm
+    ? results.filter((result) => result.examYear === selectedAcademicYear && result.examTerm === selectedTerm)
+    : results
+
+  const formatScoreDisplay = (result) => {
+    const rawScore = result.score ?? 0
+    const maxScore = result.maxMarks ?? 0
+    return maxScore > 0 ? `${rawScore}/${maxScore}` : `${rawScore}`
+  }
+
+  const renderStudentResultTable = () => {
+    if (results.length === 0) {
+      return (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+          No results have been published for you yet.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 border-b border-gray-200 overflow-x-auto">
+            <div className="flex gap-1">
+              {academicYears.map((year) => (
+                <button
+                  key={year}
+                  onClick={() => {
+                    setSelectedAcademicYear(year)
+                    setSelectedTerm('')
+                  }}
+                  className={`px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition ${
+                    selectedAcademicYear === year
+                      ? 'text-primary-blue border-primary-blue'
+                      : 'text-text-muted border-transparent hover:text-text-dark'
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {termOptions.length > 0 && (
+            <div className="mb-4 border-b border-gray-200 overflow-x-auto bg-gray-50 p-2 rounded-lg">
+              <div className="flex gap-2">
+                {termOptions.map((term) => (
+                  <button
+                    key={term}
+                    onClick={() => setSelectedTerm(term)}
+                    className={`px-4 py-2 font-medium text-sm whitespace-nowrap rounded-lg transition ${
+                      selectedTerm === term
+                        ? 'text-white bg-primary-blue'
+                        : 'text-text-muted bg-white border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Exam</th>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Subject</th>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Score</th>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Percentage</th>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Grade</th>
+                  <th className="px-4 py-3 font-semibold text-text-dark">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentResults.map((result) => {
+                  const percentage = Number.isFinite(result.percentage)
+                    ? result.percentage
+                    : getNumericPercentage(result)
+                  const showPercentage = Number.isFinite(percentage)
+                  const badgeColor = percentage >= 80
+                    ? 'text-green-600 bg-green-50'
+                    : percentage >= 60
+                    ? 'text-primary-blue bg-cyan-50'
+                    : percentage >= 40
+                    ? 'text-yellow-600 bg-yellow-50'
+                    : 'text-red-600 bg-red-50'
+
+                  return (
+                    <tr key={result._id || result.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-text-dark font-medium">
+                        <div>{result.exam || result.examName}</div>
+                        {result.examType && <div className="text-xs text-text-muted">{result.examType}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-text-dark">
+                        {result.subject || result.subjectName}
+                        {result.subjectCode && <span className="text-text-muted ml-1">({result.subjectCode})</span>}
+                      </td>
+                      <td className="px-4 py-3 text-text-dark">
+                        {formatScoreDisplay(result)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-block px-3 py-1 rounded-full font-semibold ${badgeColor}`}>
+                          {showPercentage ? `${percentage}%` : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-text-dark">{result.grade || '-'}</td>
+                      <td className="px-4 py-3 text-text-muted">{result.remarks || '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isStudentView) {
     return (
       <div className="space-y-4 p-4 sm:p-6">
@@ -250,28 +405,7 @@ function Results() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
             Loading your results...
           </div>
-        ) : results.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-            No results have been published for you yet.
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {results.map((result) => (
-              <div key={result._id || result.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-lg font-semibold text-text-dark">{result.subject?.name || result.subjectName || 'Subject'}</p>
-                    <p className="text-sm text-text-muted">{result.exam?.name || result.examName || 'Exam'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-semibold text-text-dark">{result.score ?? result.marks ?? '—'}/{result.maxMarks ?? result.totalMarks ?? '—'}</p>
-                    <p className="text-sm text-text-muted">Grade: {result.grade || '—'}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ) : renderStudentResultTable()}
       </div>
     )
   }

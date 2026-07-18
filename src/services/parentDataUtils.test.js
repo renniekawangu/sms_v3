@@ -25,6 +25,17 @@ test('matchesStudentReference resolves both student document ids and student cod
   assert.equal(matchesStudentReference(record, 'another-id'), false)
 })
 
+test('matchesStudentReference also resolves nested user_id values', () => {
+  const record = {
+    student: {
+      user_id: 'student-42',
+    },
+  }
+
+  assert.equal(matchesStudentReference(record, 'student-42'), true)
+  assert.equal(matchesStudentReference(record, 'student-99'), false)
+})
+
 test('getNumericPercentage derives values from score and maxMarks data', () => {
   assert.equal(getNumericPercentage({ score: 99, maxMarks: 100 }), 99)
   assert.equal(getNumericPercentage({ percentage: 88 }), 88)

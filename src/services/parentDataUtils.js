@@ -16,14 +16,16 @@ export const matchesStudentReference = (record, studentId) => {
   const candidates = [
     record.studentId,
     record.student_id,
+    record.userId,
+    record.user_id,
+    record.uid,
     record.student?.id,
     record.student?._id,
     record.student?.studentId,
     record.student?.student_id,
     record.student?.uid,
     record.student?.userId,
-    record.userId,
-    record.uid,
+    record.student?.user_id,
   ]
 
   return candidates.some((candidate) => String(candidate || '').trim() === target)
