@@ -164,6 +164,9 @@ function Subjects() {
                   <h3 className="font-semibold text-slate-900">{subject.name}</h3>
                   <p className="text-sm text-slate-500 mt-1">Code: {subject.code || '—'}</p>
                   <p className="text-xs text-slate-400 mt-2">Grade {subject.grade}</p>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-blue/10 px-3 py-1 text-xs font-medium text-primary-blue">
+                    View materials
+                  </div>
                 </Link>
               )
             })}
@@ -236,17 +239,23 @@ function Subjects() {
                     <td className="py-3 px-4 text-sm text-text-muted">Grade {subject.grade}</td>
                     <td className="py-3 px-4 text-sm text-text-muted">{subject.description || '-'}</td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/subjects/${subject._id || subject.subject_id || subject.id}`}
+                          className="inline-flex items-center gap-1 rounded-full border border-primary-blue px-3 py-1 text-xs font-medium text-primary-blue hover:bg-primary-blue/10 transition-colors"
+                        >
+                          View
+                        </Link>
                         <button
                           onClick={() => handleEdit(subject)}
-                          className="text-primary-blue hover:text-primary-blue/80 text-sm font-medium flex items-center gap-1"
+                          className="inline-flex items-center gap-1 rounded-full text-primary-blue hover:text-primary-blue/80 text-sm font-medium"
                         >
                           <Edit size={16} />
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(subject._id || subject.subject_id)}
-                          className="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1"
+                          className="inline-flex items-center gap-1 rounded-full text-red-500 hover:text-red-600 text-sm font-medium"
                         >
                           <Trash2 size={16} />
                           Delete
