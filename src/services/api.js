@@ -2539,6 +2539,14 @@ export const examApi = {
     })
   },
 
+  // Alias for clarity: `edit` does the same as `update`
+  edit: async (id, data) => {
+    return apiCall(`/exams/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
   delete: async (id) => {
     return apiCall(`/exams/${id}`, {
       method: 'DELETE',
