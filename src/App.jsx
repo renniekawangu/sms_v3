@@ -21,6 +21,7 @@ const Staffs = lazy(() => import('./pages/Staffs'))
 const Classrooms = lazy(() => import('./pages/Classrooms'))
 const ViewClassroom = lazy(() => import('./pages/ViewClassroom'))
 const Subjects = lazy(() => import('./pages/Subjects'))
+const SubjectDetail = lazy(() => import('./pages/SubjectDetail'))
 const Timetable = lazy(() => import('./pages/Timetable'))
 const Children = lazy(() => import('./pages/Children'))
 const ChildDetail = lazy(() => import('./pages/ChildDetail'))
@@ -40,6 +41,7 @@ const ReportCards = lazy(() => import('./pages/ReportCards'))
 const Exams = lazy(() => import('./pages/Exams'))
 const Results = lazy(() => import('./pages/Results'))
 const ResultsApproval = lazy(() => import('./pages/ResultsApproval'))
+const StudentAccount = lazy(() => import('./pages/StudentAccount'))
 
 function RouteFallback() {
   return (
@@ -197,13 +199,25 @@ function App() {
                 }
               />
 
-              {/* Subjects - TEACHER, HEAD_TEACHER & ADMIN */}
+              {/* Subjects - TEACHER, HEAD_TEACHER, ADMIN & STUDENT */}
               <Route
                 path="/subjects"
                 element={
-                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN]} route="/subjects">
+                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.STUDENT]} route="/subjects">
                     <Layout>
                       <Subjects />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Subject detail - TEACHER, HEAD_TEACHER, ADMIN & STUDENT */}
+              <Route
+                path="/subjects/:id"
+                element={
+                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.STUDENT]} route="/subjects/:id">
+                    <Layout>
+                      <SubjectDetail />
                     </Layout>
                   </ProtectedRoute>
                 }
@@ -249,9 +263,21 @@ function App() {
               <Route
                 path="/attendance"
                 element={
-                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN]} route="/attendance">
+                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.STUDENT]} route="/attendance">
                     <Layout>
                       <Attendance />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Student account - STUDENT ONLY */}
+              <Route
+                path="/student-account"
+                element={
+                  <ProtectedRoute requiredRole={ROLES.STUDENT} route="/student-account">
+                    <Layout>
+                      <StudentAccount />
                     </Layout>
                   </ProtectedRoute>
                 }
@@ -261,7 +287,7 @@ function App() {
               <Route
                 path="/exams"
                 element={
-                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN]} route="/exams">
+                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.STUDENT]} route="/exams">
                     <Layout>
                       <Exams />
                     </Layout>
@@ -273,7 +299,7 @@ function App() {
               <Route
                 path="/results"
                 element={
-                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN]} route="/results">
+                  <ProtectedRoute requiredRole={[ROLES.TEACHER, ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.STUDENT]} route="/results">
                     <Layout>
                       <Results />
                     </Layout>
@@ -345,11 +371,11 @@ function App() {
                 }
               />
 
-              {/* Issues - All authenticated users can view/create */}
+              {/* Issues - Admin only */}
               <Route
                 path="/issues"
                 element={
-                  <ProtectedRoute route="/issues">
+                  <ProtectedRoute requiredRole={ROLES.ADMIN} route="/issues">
                     <Layout>
                       <Issues />
                     </Layout>
@@ -393,11 +419,11 @@ function App() {
                 }
               />
 
-              {/* Report Cards - HEAD_TEACHER, TEACHER, ADMIN & STUDENT */}
+              {/* Report Cards - HEAD_TEACHER, TEACHER, ADMIN */}
               <Route
                 path="/report-cards"
                 element={
-                  <ProtectedRoute requiredRole={[ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT]} route="/report-cards">
+                  <ProtectedRoute requiredRole={[ROLES.HEAD_TEACHER, ROLES.ADMIN, ROLES.TEACHER]} route="/report-cards">
                     <Layout>
                       <ReportCards />
                     </Layout>

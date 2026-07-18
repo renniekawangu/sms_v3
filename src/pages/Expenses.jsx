@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import ExpenseForm from '../components/ExpenseForm'
 import { useCurrency, formatCurrency } from '../hooks/useCurrency'
+import { notifyAccountDataRefresh, subscribeToAccountRefresh } from '../utils/accountRefresh'
 
 function Expenses() {
   const [expenses, setExpenses] = useState([])
@@ -18,6 +19,11 @@ function Expenses() {
 
   useEffect(() => {
     loadExpenses()
+    const unsubscribe = subscribeToAccountRefresh(() => {
+      loadExpenses()
+    })
+
+    return unsubscribe
   }, [])
 
   const loadExpenses = async () => {
@@ -47,8 +53,9 @@ function Expenses() {
 
   const handleSubmit = async (formData) => {
     try {
+      const expenseId = editingExpense?._id || editingExpense?.expense_id
       if (editingExpense) {
-        await expensesApi.update(editingExpense.expense_id, formData)
+        await expensesApi.update(expenseId, formData)
         success('Expense updated successfully')
       } else {
         await expensesApi.create(formData)
@@ -56,6 +63,7 @@ function Expenses() {
       }
       setIsModalOpen(false)
       setEditingExpense(null)
+      notifyAccountDataRefresh()
       await loadExpenses()
     } catch (err) {
       const errorMessage = err.message || (editingExpense ? 'Failed to update expense' : 'Failed to create expense')
@@ -63,11 +71,13 @@ function Expenses() {
     }
   }
 
-  const handleDelete = async (expense_id) => {
+  const handleDelete = async (expenseId) => {
+    if (!expenseId) return
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        await expensesApi.delete(expense_id)
+        await expensesApi.delete(expenseId)
         success('Expense deleted successfully')
+        notifyAccountDataRefresh()
         await loadExpenses()
       } catch (err) {
         const errorMessage = err.message || 'Failed to delete expense'
@@ -85,7 +95,8 @@ function Expenses() {
       return (
         expense.category?.toLowerCase().includes(query) ||
         expense.description?.toLowerCase().includes(query) ||
-        expense.expense_id?.toString().includes(query)
+        expense.expense_id?.toString().toLowerCase().includes(query) ||
+        expense._id?.toString().toLowerCase().includes(query)
       )
     })
   }, [expenses, searchQuery])
@@ -173,35 +184,38 @@ function Expenses() {
                   </td>
                 </tr>
               ) : (
-                filteredExpenses.map((expense) => (
-                  <tr key={expense.expense_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 text-sm text-text-dark">{expense.expense_id}</td>
-                    <td className="py-3 px-4 text-sm text-text-dark font-medium">{expense.category}</td>
-                    <td className="py-3 px-4 text-sm text-text-dark font-medium">{formatCurrency(expense.amount, currency)}</td>
-                    <td className="py-3 px-4 text-sm text-text-muted">
-                      {expense.date ? (expense.date.includes('T') ? expense.date.split('T')[0] : expense.date) : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-text-muted">{expense.description || '-'}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleEdit(expense)}
-                          className="text-primary-blue hover:text-primary-blue/80 text-sm font-medium flex items-center gap-1"
-                        >
-                          <Edit size={16} />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(expense.expense_id)}
-                          className="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1"
-                        >
-                          <Trash2 size={16} />
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredExpenses.map((expense, index) => {
+                  const recordId = expense._id || expense.expense_id || expense.id || String(index)
+                  return (
+                    <tr key={recordId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 text-sm text-text-dark">{expense.expense_id || expense._id || expense.id || index}</td>
+                      <td className="py-3 px-4 text-sm text-text-dark font-medium">{expense.category}</td>
+                      <td className="py-3 px-4 text-sm text-text-dark font-medium">{formatCurrency(expense.amount, currency)}</td>
+                      <td className="py-3 px-4 text-sm text-text-muted">
+                        {expense.date ? (expense.date.includes('T') ? expense.date.split('T')[0] : expense.date) : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-text-muted">{expense.description || '-'}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleEdit(expense)}
+                            className="text-primary-blue hover:text-primary-blue/80 text-sm font-medium flex items-center gap-1"
+                          >
+                            <Edit size={16} />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(expense._id || expense.expense_id)}
+                            className="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1"
+                          >
+                            <Trash2 size={16} />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

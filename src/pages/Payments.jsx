@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import PaymentForm from '../components/PaymentForm'
 import PageHeader from '../components/PageHeader'
+import { notifyAccountDataRefresh, subscribeToAccountRefresh } from '../utils/accountRefresh'
 
 function Payments() {
   const [payments, setPayments] = useState([])
@@ -31,6 +32,14 @@ function Payments() {
   useEffect(() => {
     loadData()
   }, [currentPage, filters])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAccountRefresh(() => {
+      loadData()
+    })
+
+    return unsubscribe
+  }, [])
 
   const loadData = async () => {
     try {
@@ -86,6 +95,7 @@ function Payments() {
       success('Payment recorded successfully')
       setIsModalOpen(false)
       setCurrentPage(1)
+      notifyAccountDataRefresh()
       await loadData()
     } catch (err) {
       const errorMessage = err.message || 'Failed to record payment'
@@ -101,6 +111,7 @@ function Payments() {
       setIsApproving(paymentId)
       await accountsApi.updatePayment(paymentId, { status: 'paid' })
       success('Payment approved')
+      notifyAccountDataRefresh()
       await loadData()
     } catch (err) {
       const errorMessage = err.message || 'Failed to approve payment'

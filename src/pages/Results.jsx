@@ -17,6 +17,7 @@ import PageHeader from '../components/PageHeader'
 function Results() {
   const { user } = useAuth()
   const normalizedUserRole = normalizeRole(user?.role)
+  const isStudentView = normalizedUserRole === ROLES.STUDENT
   const navigate = useNavigate()
   const { error: showError, success: showSuccess } = useToast()
   
@@ -38,9 +39,30 @@ function Results() {
 
   useEffect(() => {
     loadInitialData()
-  }, [])
+  }, [normalizedUserRole, user?.student_id, user?.studentId, user?._id, user?.uid])
 
   const loadInitialData = async () => {
+    if (isStudentView) {
+      try {
+        setLoading(true)
+        const studentId = user?.student_id || user?.studentId || user?._id || user?.uid
+        if (!studentId) {
+          setResults([])
+          return
+        }
+
+        const data = await resultApi.getByStudent(studentId)
+        const resultsData = Array.isArray(data) ? data : data.results || data.data || []
+        setResults(resultsData)
+      } catch (err) {
+        console.error('Student results load error:', err)
+        showError(err.message || 'Failed to load your results')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -215,6 +237,44 @@ function Results() {
   const filteredResults = results
     .filter(result => !statusFilter || normalizeResultStatus(result.status) === statusFilter)
     .filter(result => !subjectFilter || result.subject?.name === subjectFilter)
+
+  if (isStudentView) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-dark">My Results</h1>
+          <p className="text-sm text-text-muted mt-1">View your academic results and grades.</p>
+        </div>
+
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            Loading your results...
+          </div>
+        ) : results.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            No results have been published for you yet.
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {results.map((result) => (
+              <div key={result._id || result.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-text-dark">{result.subject?.name || result.subjectName || 'Subject'}</p>
+                    <p className="text-sm text-text-muted">{result.exam?.name || result.examName || 'Exam'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-semibold text-text-dark">{result.score ?? result.marks ?? '—'}/{result.maxMarks ?? result.totalMarks ?? '—'}</p>
+                    <p className="text-sm text-text-muted">Grade: {result.grade || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="page-stack">

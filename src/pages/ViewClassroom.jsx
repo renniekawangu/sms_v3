@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { classroomApi, teachersApi } from '../services/api';
+import { classroomApi, teachersApi, studentsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, School, Users, User, AlertCircle, Mail, Calendar, Clock } from 'lucide-react';
 import Homework from '../components/Homework';
@@ -14,6 +14,50 @@ function ViewClassroom() {
   const [classroom, setClassroom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const normalizeStudentData = (student) => {
+    if (!student) return null;
+    const id = student._id || student.id || student.student_id || student.studentId || student.uid;
+    const name = student.name || [student.firstName, student.lastName].filter(Boolean).join(' ').trim();
+    return {
+      ...student,
+      _id: id || student._id || student.id || student.student_id || student.studentId || String(name || 'student'),
+      name: name || student.studentId || student.student_id || student._id || 'Student',
+      email: student.email || '',
+    };
+  };
+
+  const resolveStudentRef = async (studentRef) => {
+    if (!studentRef) return null;
+    if (typeof studentRef === 'string' || typeof studentRef === 'number') {
+      const studentId = String(studentRef);
+      try {
+        const result = await studentsApi.get(studentId);
+        return normalizeStudentData(result);
+      } catch (err) {
+        return { _id: studentId, name: studentId, email: '' };
+      }
+    }
+
+    if (typeof studentRef === 'object') {
+      const normalized = normalizeStudentData(studentRef);
+      if (normalized.name && normalized.name !== 'Student' && normalized.name !== normalized._id) {
+        return normalized;
+      }
+      const studentId = normalized._id;
+      if (studentId) {
+        try {
+          const result = await studentsApi.get(studentId);
+          return normalizeStudentData(result);
+        } catch (err) {
+          return normalized;
+        }
+      }
+      return normalized;
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     async function fetchClassroom() {
@@ -38,9 +82,17 @@ function ViewClassroom() {
           }
         }
 
+        let resolvedStudents = [];
+        if (Array.isArray(data.students) && data.students.length > 0) {
+          const studentPromises = data.students.map((student) => resolveStudentRef(student));
+          const resolved = await Promise.all(studentPromises);
+          resolvedStudents = resolved.filter(Boolean);
+        }
+
         setClassroom({
           ...data,
           teacher_name: teacherName || 'No teacher assigned',
+          students: resolvedStudents,
         });
       } catch (err) {
         setError(err.message || 'Failed to load classroom');

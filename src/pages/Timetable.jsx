@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Calendar, Search, Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { timetableApi, classroomsApi, subjectsApi, teachersApi } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import { ROLES, normalizeRole } from '../config/rbac'
 import { exportToCSV, exportToJSON } from '../utils/exportData'
 import { filterData, sortData, searchData, paginateData, getUniqueValues } from '../utils/filterSort'
 import { useToast } from '../contexts/ToastContext'
@@ -12,6 +14,10 @@ import AdvancedSearch from '../components/AdvancedSearch'
 import Pagination from '../components/Pagination'
 
 function Timetable() {
+  const { user } = useAuth()
+  const normalizedRole = normalizeRole(user?.role)
+  const isStudentView = normalizedRole === ROLES.STUDENT
+
   const [classrooms, setClassrooms] = useState([])
   const [subjects, setSubjects] = useState([])
   const [teachers, setTeachers] = useState([])
@@ -92,12 +98,14 @@ function Timetable() {
         ;(data.timetable || []).forEach(day => {
           ;(day.periods || []).forEach(p => {
             const start = (p.time || '').split('-')[0] || ''
+            const subjectValue = typeof p.subject === 'object' ? (p.subject?.name || '') : (p.subject || '')
             entries.push({
               _id: `${data._id}:${day.day}:${p.period}`,
+              day: day.day,
               dayOfWeek: day.day,
               startTime: start,
-              subjectName: p.subject,
-              subject: { name: p.subject },
+              subject: subjectValue,
+              subjectName: subjectValue,
               teacher: p.instructorId ? { firstName: p.instructorId.firstName, lastName: p.instructorId.lastName, _id: p.instructorId._id } : undefined
             })
           })
@@ -253,6 +261,21 @@ function Timetable() {
     }))
   ), [timetable])
 
+  const groupedTimetable = useMemo(() => {
+    const groups = days.reduce((acc, day) => ({ ...acc, [day]: [] }), {})
+    normalized.forEach((entry) => {
+      const dayLabel = entry.dayOfWeek || entry.day || 'Unscheduled'
+      if (!groups[dayLabel]) groups[dayLabel] = []
+      groups[dayLabel].push(entry)
+    })
+
+    Object.keys(groups).forEach((day) => {
+      groups[day].sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')))
+    })
+
+    return Object.fromEntries(Object.entries(groups).filter(([, entries]) => entries.length > 0))
+  }, [normalized, days])
+
   const processedEntries = useMemo(() => {
     let result = filterData(normalized, filters)
     result = searchData(result, searchQuery, ['dayOfWeek', 'startTime', 'subjectName', 'teacherName'])
@@ -300,6 +323,59 @@ function Timetable() {
             Retry
           </button>
         </div>
+      </div>
+    )
+  }
+
+  // Student view - read-only timetable
+  if (isStudentView) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-dark">My Timetable</h1>
+          <p className="text-sm text-text-muted mt-1">Your class schedule</p>
+        </div>
+
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary-blue border-t-transparent" />
+            Loading your timetable...
+          </div>
+        ) : Object.keys(groupedTimetable).length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            Your timetable will be displayed once it is published.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedTimetable).map(([day, entries]) => (
+              <section key={day} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-900">{day}</h2>
+                  <p className="text-sm text-slate-500">{entries.length} class{entries.length === 1 ? '' : 'es'} scheduled</p>
+                </div>
+                <div className="grid gap-3">
+                  {entries.map((entry) => (
+                    <div key={entry._id || entry.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-slate-900">{entry.subject || entry.subjectName}</h3>
+                          <p className="text-sm text-slate-500 mt-1">Room: {entry.room || 'TBD'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-slate-900">
+                            {entry.startTime}
+                            {entry.endTime && ` – ${entry.endTime}`}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">{entry.teacherName || 'No teacher assigned'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

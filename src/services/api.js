@@ -525,6 +525,129 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
       const [fees, payments, expenses] = await Promise.all([listDocuments('fees'), listDocuments('payments'), listDocuments('expenses')])
       return { fees: fees.length, payments: payments.length, expenses: expenses.length }
     }
+
+    const parseReportDate = (record) => {
+      const rawDate = record.date || record.dueDate || record.createdAt || record.updatedAt
+      if (!rawDate) return null
+      if (rawDate instanceof Date) return rawDate
+      if (typeof rawDate.toDate === 'function') return rawDate.toDate()
+      return new Date(rawDate)
+    }
+
+    const filterByReportParams = (items) => {
+      return items.filter((item) => {
+        if (queryParams.academicYear) {
+          const yearValue = item.academicYear || item.academic_year || item.year
+          if (String(yearValue) !== String(queryParams.academicYear)) {
+            return false
+          }
+        }
+
+        const recordDate = parseReportDate(item)
+        if (queryParams.startDate && recordDate) {
+          const start = new Date(queryParams.startDate)
+          if (recordDate < start) return false
+        }
+        if (queryParams.endDate && recordDate) {
+          const end = new Date(queryParams.endDate)
+          end.setHours(23, 59, 59, 999)
+          if (recordDate > end) return false
+        }
+        return true
+      })
+    }
+
+    if (first === 'reports' && second === 'summary' && method === 'GET') {
+      const [fees, payments] = await Promise.all([listDocuments('fees'), listDocuments('payments')])
+      const filteredFees = filterByReportParams(fees)
+      const filteredPayments = filterByReportParams(payments)
+
+      const totalFees = filteredFees.reduce((sum, item) => sum + (item.amount || 0), 0)
+      const totalPaid = filteredPayments.reduce((sum, item) => sum + (item.amount || item.paidAmount || item.amountPaid || 0), 0)
+      const totalOutstanding = filteredFees.reduce((sum, item) => {
+        const paid = item.amountPaid || item.paidAmount || 0
+        return sum + Math.max(0, (item.amount || 0) - paid)
+      }, 0)
+
+      const feeBreakdown = filteredFees.reduce(
+        (breakdown, item) => {
+          const outstanding = Math.max(0, (item.amount || 0) - (item.amountPaid || item.paidAmount || 0))
+          const status = (item.status || '').toString().toLowerCase()
+          if (status === 'paid' || outstanding === 0) {
+            breakdown.paid += 1
+          } else if (status === 'pending') {
+            breakdown.pending += 1
+          } else {
+            breakdown.unpaid += 1
+          }
+          return breakdown
+        },
+        { paid: 0, pending: 0, unpaid: 0 }
+      )
+
+      const paidPercentage = totalFees > 0 ? Math.round((totalPaid / totalFees) * 100) : 0
+      return {
+        summary: {
+          totalFees,
+          totalPaid,
+          totalOutstanding,
+          paidPercentage,
+          feeBreakdown,
+        },
+      }
+    }
+
+    if (first === 'reports' && second === 'overdue' && method === 'GET') {
+      const fees = await listDocuments('fees')
+      const overdueFees = fees
+        .map((item) => {
+          const amountPaid = item.amountPaid || item.paidAmount || 0
+          const outstandingAmount = Math.max(0, (item.amount || 0) - amountPaid)
+          const recordDate = parseReportDate(item) || new Date()
+          const now = new Date()
+          const daysOverdue = recordDate ? Math.max(0, Math.floor((now - recordDate) / (1000 * 60 * 60 * 24))) : 0
+          return { ...item, outstandingAmount, daysOverdue, recordDate }
+        })
+        .filter((item) => item.outstandingAmount > 0 && item.daysOverdue > 0)
+        .sort((a, b) => b.outstandingAmount - a.outstandingAmount)
+
+      return {
+        count: overdueFees.length,
+        totalOverdue: overdueFees.reduce((sum, item) => sum + item.outstandingAmount, 0),
+        fees: overdueFees.slice(0, 10),
+      }
+    }
+
+    if (first === 'reports' && second === 'collection-trend' && method === 'GET') {
+      const months = Number(queryParams.months || 12)
+      const payments = await listDocuments('payments')
+      const grouped = {}
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth() - months + 1, 1)
+
+      payments.forEach((item) => {
+        const date = parseReportDate(item) || new Date()
+        if (date < start) return
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const key = `${year}-${month}`
+        if (!grouped[key]) {
+          grouped[key] = { _id: { year, month }, totalAmount: 0, count: 0 }
+        }
+        grouped[key].totalAmount += item.amount || item.paidAmount || item.amountPaid || 0
+        grouped[key].count += 1
+      })
+
+      const trend = []
+      for (let i = months - 1; i >= 0; i -= 1) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const key = `${date.getFullYear()}-${date.getMonth() + 1}`
+        trend.push(grouped[key] || { _id: { year: date.getFullYear(), month: date.getMonth() + 1 }, totalAmount: 0, count: 0 })
+      }
+
+      return { trend }
+    }
+
     if (first === 'reports' && method === 'GET') {
       const [fees, payments] = await Promise.all([listDocuments('fees'), listDocuments('payments')])
       return { feeTotal: fees.reduce((sum, item) => sum + (item.amount || 0), 0), paymentTotal: payments.reduce((sum, item) => sum + (item.amount || 0), 0) }
@@ -667,7 +790,13 @@ const firestoreRequest = async (method, endpoint, body, queryParams = {}) => {
     }
     if (first === 'fees' && method === 'GET') {
       const profile = await getCurrentUserProfile()
-      return listDocuments('fees', { studentId: profile.studentId || currentUser.uid })
+      const fees = await listDocuments('fees').catch(() => [])
+      return fees.filter((fee) => matchesStudentReference(fee, profile.studentId || currentUser.uid))
+    }
+    if (first === 'payments' && method === 'GET') {
+      const profile = await getCurrentUserProfile()
+      const payments = await listDocuments('payments').catch(() => [])
+      return payments.filter((payment) => matchesStudentReference(payment, profile.studentId || currentUser.uid))
     }
     if (first === 'subjects' && method === 'GET') {
       return listDocuments('subjects', queryParams)
@@ -2160,6 +2289,85 @@ export const teacherApi = {
   },
 };
 
+// Student API - Helper functions to normalize data for student view (only essential fields)
+const normalizeAttendanceRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    date: record.date || record.createdAt,
+    status: record.status || 'unknown',
+    remarks: record.remarks || ''
+  }
+}
+
+const normalizeResultRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    subject: record.subject?.name || record.subjectName || 'Subject',
+    exam: record.exam?.name || record.examName || 'Exam',
+    score: record.score || record.marks || 0,
+    maxMarks: record.maxMarks || record.totalMarks || 100,
+    grade: record.grade || 'N/A',
+    remarks: record.remarks || ''
+  }
+}
+
+const normalizeFeeRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    description: record.description || record.title || 'Fee',
+    amount: Number(record.amount || 0),
+    amountPaid: Number(record.amountPaid || record.paidAmount || 0),
+    dueDate: record.dueDate || record.due_date || ''
+  }
+}
+
+const normalizePaymentRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    date: record.date || record.paymentDate || record.createdAt,
+    amount: Number(record.amount || 0),
+    method: record.method || record.paymentMethod || 'cash',
+    reference: record.reference || record.referenceNumber || ''
+  }
+}
+
+const normalizeSubjectRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    name: record.name || 'Subject',
+    code: record.code || '',
+    teacher: record.teacher?.name || record.teacherName || ''
+  }
+}
+
+const normalizeExamRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    name: record.name || 'Exam',
+    startDate: record.startDate || record.start_date || '',
+    endDate: record.endDate || record.end_date || '',
+    type: record.type || record.examType || ''
+  }
+}
+
+const normalizeTimeTableRecord = (record) => {
+  if (!record) return null
+  return {
+    _id: record._id || record.id,
+    subject: record.subject?.name || record.subjectName || 'Subject',
+    day: record.day || '',
+    startTime: record.startTime || record.start_time || '',
+    endTime: record.endTime || record.end_time || '',
+    room: record.room || record.roomNumber || ''
+  }
+}
+
 // Student API
 export const studentApi = {
   getDashboard: async () => {
@@ -2188,33 +2396,59 @@ export const studentApi = {
   },
 
   getMyAttendance: async () => {
-    return apiCall('/student/attendance', {
+    const data = await apiCall('/student/attendance', {
       method: 'GET',
-    });
+    })
+    const records = Array.isArray(data) ? data : (data?.attendance || data?.data || [])
+    return records.map(normalizeAttendanceRecord).filter(Boolean)
   },
 
   getMyFees: async () => {
-    return apiCall('/student/fees', {
+    const data = await apiCall('/student/fees', {
       method: 'GET',
-    });
+    })
+    const fees = Array.isArray(data) ? data : (data?.fees || data?.data || [])
+    return fees.map(normalizeFeeRecord).filter(Boolean)
+  },
+
+  getMyPayments: async () => {
+    const data = await apiCall('/student/payments', {
+      method: 'GET',
+    })
+    const payments = Array.isArray(data) ? data : (data?.payments || data?.data || [])
+    return payments.map(normalizePaymentRecord).filter(Boolean)
   },
 
   getMySubjects: async () => {
-    return apiCall('/student/subjects', {
+    const data = await apiCall('/student/subjects', {
       method: 'GET',
-    });
+    })
+    const subjects = Array.isArray(data) ? data : (data?.subjects || data?.data || [])
+    return subjects.map(normalizeSubjectRecord).filter(Boolean)
   },
 
   getExamSchedule: async () => {
-    return apiCall('/student/exams', {
+    const data = await apiCall('/student/exams', {
       method: 'GET',
-    });
+    })
+    const exams = Array.isArray(data) ? data : (data?.exams || data?.data || [])
+    return exams.map(normalizeExamRecord).filter(Boolean)
+  },
+
+  getMyGrades: async () => {
+    const data = await apiCall('/student/grades', {
+      method: 'GET',
+    })
+    const grades = Array.isArray(data) ? data : (data?.grades || data?.results || data?.data || [])
+    return grades.map(normalizeResultRecord).filter(Boolean)
   },
 
   getTimeTable: async () => {
-    return apiCall('/student/timetable', {
+    const data = await apiCall('/student/timetable', {
       method: 'GET',
-    });
+    })
+    const timetable = Array.isArray(data) ? data : (data?.timetable || data?.data || [])
+    return timetable.map(normalizeTimeTableRecord).filter(Boolean)
   },
 };
 
@@ -2777,7 +3011,9 @@ export const resultApi = {
   // Viewing operations
   getByStudent: async (studentId, filters = {}) => {
     const query = new URLSearchParams(filters).toString()
-    return apiCall(`/results/student/${studentId}${query ? '?' + query : ''}`)
+    const data = await apiCall(`/results/student/${studentId}${query ? '?' + query : ''}`)
+    const results = Array.isArray(data) ? data : (data?.results || data?.data || [])
+    return results.map(normalizeResultRecord).filter(Boolean)
   },
 
   getExamStatistics: async (examId, filters = {}) => {

@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CheckCircle, Search, AlertCircle, Users, Calendar, Download } from 'lucide-react'
-import { attendanceApi, classroomsApi, teacherApi, studentsApi } from '../services/api'
+import { attendanceApi, classroomsApi, teacherApi, studentsApi, studentApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
 
 function Attendance() {
   const { user } = useAuth()
+  const normalizedRole = normalizeRole(user?.role)
+  const isStudentView = normalizedRole === ROLES.STUDENT
   const { success, error: showError } = useToast()
   
   const [classrooms, setClassrooms] = useState([])
@@ -21,8 +23,13 @@ function Attendance() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    if (isStudentView) {
+      loadStudentAttendance()
+      return
+    }
+
     loadClassrooms()
-  }, [user])
+  }, [user, isStudentView])
 
   const loadClassrooms = async () => {
     try {
@@ -42,12 +49,36 @@ function Attendance() {
     }
   }
 
+  const loadStudentAttendance = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await studentApi.getMyAttendance()
+      const records = Array.isArray(data) ? data : (data?.attendance || data?.data || [])
+      setAttendance(records)
+      setClassroomStudents([])
+      setClassrooms([])
+      setSelectedClassroom(null)
+    } catch (err) {
+      const errorMessage = err.message || 'Failed to load your attendance'
+      setError(errorMessage)
+      showError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
+    if (isStudentView) {
+      loadStudentAttendance()
+      return
+    }
+
     if (selectedClassroom) {
       loadClassroomStudents()
       loadAttendance()
     }
-  }, [selectedClassroom, selectedDate])
+  }, [selectedClassroom, selectedDate, isStudentView])
 
   const loadClassroomStudents = async () => {
     if (!selectedClassroom) return
@@ -271,6 +302,61 @@ function Attendance() {
     success('Attendance exported successfully')
   }
 
+  if (isStudentView) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-dark">My Attendance</h1>
+          <p className="text-sm text-text-muted mt-1">Your attendance records for the current term.</p>
+        </div>
+
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            Loading your attendance...
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        ) : attendance.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            No attendance records have been added for you yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendance.map((record) => {
+                  const rawDate = record.date || record.createdAt || record.updatedAt
+                  const displayDate = rawDate instanceof Date
+                    ? rawDate.toLocaleDateString()
+                    : (typeof rawDate === 'string' ? rawDate : '—')
+
+                  return (
+                    <tr key={record._id || record.id} className="border-t border-slate-100">
+                      <td className="px-4 py-3 text-slate-700">{displayDate}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${record.status === 'present' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {record.status || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{record.remarks || '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (loading && classrooms.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -332,7 +418,7 @@ function Attendance() {
         </div>
 
         <div>
-          <label className="block text-xs sm:text-sm font-medium text-text-dark mb-1 sm:mb-2 flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-text-dark mb-1 sm:mb-2">
             <Calendar size={14} className="sm:size-4" />
             Select Date
           </label>

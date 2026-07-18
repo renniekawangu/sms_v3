@@ -10,6 +10,7 @@ import { useCurrency, formatCurrency } from '../hooks/useCurrency'
 import { debounce } from '../utils/helpers'
 import { TableSkeleton } from '../components/LoadingSkeleton'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { notifyAccountDataRefresh, subscribeToAccountRefresh } from '../utils/accountRefresh'
 
 function Fees() {
   const [fees, setFees] = useState([])
@@ -59,6 +60,14 @@ function Fees() {
     loadData()
   }, [filters])
 
+  useEffect(() => {
+    const unsubscribe = subscribeToAccountRefresh(() => {
+      loadData()
+    })
+
+    return unsubscribe
+  }, [])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -105,6 +114,7 @@ function Fees() {
       }
       setIsModalOpen(false)
       setEditingFee(null)
+      notifyAccountDataRefresh()
       await loadData()
     } catch (err) {
       const errorMessage = err.message || (editingFee ? 'Failed to update fee' : 'Failed to create fee')
@@ -117,6 +127,7 @@ function Fees() {
       try {
         await feesApi.delete(id)
         success('Fee deleted successfully')
+        notifyAccountDataRefresh()
         await loadData()
       } catch (err) {
         const errorMessage = err.message || 'Failed to delete fee'

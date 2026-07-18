@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, CheckCircle, AlertCircle, Loader } from 'lucide-react'
+import { Plus, Edit, Trash2, CheckCircle, AlertCircle, Loader, Calendar } from 'lucide-react'
 import { examApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../contexts/AuthContext'
-import { ROLES } from '../config/rbac'
+import { ROLES, normalizeRole } from '../config/rbac'
 import ExamForm from '../components/ExamForm'
 
 function Exams() {
   const { user } = useAuth()
+  const normalizedRole = normalizeRole(user?.role)
+  const isStudentView = normalizedRole === ROLES.STUDENT
   const navigate = useNavigate()
   const { error: showError, success: showSuccess } = useToast()
   
@@ -99,6 +101,51 @@ function Exams() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader className="animate-spin" size={40} />
+      </div>
+    )
+  }
+
+  // Student view - read-only list
+  if (isStudentView) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-dark">Exam Schedule</h1>
+          <p className="text-sm text-text-muted mt-1">Your upcoming and past exams</p>
+        </div>
+
+        {exams.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            No exams scheduled for you yet.
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {exams.map((exam) => {
+              const startDate = exam.startDate ? new Date(exam.startDate).toLocaleDateString() : 'TBD'
+              const endDate = exam.endDate ? new Date(exam.endDate).toLocaleDateString() : 'TBD'
+
+              return (
+                <div key={exam._id || exam.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900">{exam.name}</h3>
+                      <p className="text-sm text-slate-500 mt-1">Type: {exam.type || 'Regular'}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
+                        <Calendar size={14} />
+                        {startDate}
+                      </div>
+                      {startDate !== endDate && (
+                        <p className="text-xs text-slate-400">to {endDate}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }

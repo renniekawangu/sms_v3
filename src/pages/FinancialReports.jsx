@@ -3,6 +3,7 @@ import { BarChart3, TrendingUp, AlertTriangle, Calendar, Download, Filter } from
 import { accountsApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
+import { subscribeToAccountRefresh } from '../utils/accountRefresh'
 
 function FinancialReports() {
   const [summary, setSummary] = useState(null)
@@ -30,7 +31,15 @@ function FinancialReports() {
 
   useEffect(() => {
     loadReports()
-  }, [academicYear])
+  }, [academicYear, dateRange])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAccountRefresh(() => {
+      loadReports()
+    })
+
+    return unsubscribe
+  }, [])
 
   const loadReports = async () => {
     try {

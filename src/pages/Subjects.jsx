@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { BookOpen, Search, Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { subjectsApi } from '../services/api'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
+import { ROLES, normalizeRole } from '../config/rbac'
 import Modal from '../components/Modal'
 import SubjectForm from '../components/SubjectForm'
 
 function Subjects() {
+  const { user } = useAuth()
+  const normalizedRole = normalizeRole(user?.role)
+  const isStudentView = normalizedRole === ROLES.STUDENT
   const [subjects, setSubjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -117,6 +123,57 @@ function Subjects() {
     )
   }
 
+  // Student view - read-only list
+  if (isStudentView) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-dark">My Subjects</h1>
+          <p className="text-sm text-text-muted mt-1">Your subjects for this term</p>
+        </div>
+
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary-blue border-t-transparent" />
+            Loading subjects...
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="mt-0.5" />
+              <div>
+                <p className="font-medium">Could not load subjects</p>
+                <p className="mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        ) : subjects.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            No subjects have been added for your classroom yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {subjects.map((subject) => {
+              const subjectId = subject._id || subject.subject_id || subject.id
+              return (
+                <Link
+                  key={subjectId}
+                  to={`/subjects/${subjectId}`}
+                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow block"
+                >
+                  <h3 className="font-semibold text-slate-900">{subject.name}</h3>
+                  <p className="text-sm text-slate-500 mt-1">Code: {subject.code || '—'}</p>
+                  <p className="text-xs text-slate-400 mt-2">Grade {subject.grade}</p>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Teacher/Admin view - full management interface
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 p-3 sm:p-4 lg:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -170,7 +227,11 @@ function Subjects() {
                 filteredSubjects.map((subject) => (
                   <tr key={subject._id || subject.subject_id || Math.random()} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-3 px-4 text-sm text-text-dark">{subject.subject_id || subject._id}</td>
-                    <td className="py-3 px-4 text-sm text-text-dark font-medium">{subject.name}</td>
+                    <td className="py-3 px-4 text-sm text-text-dark font-medium">
+                      <Link to={`/subjects/${subject._id || subject.subject_id || subject.id}`} className="hover:text-primary-blue transition-colors">
+                        {subject.name}
+                      </Link>
+                    </td>
                     <td className="py-3 px-4 text-sm text-text-dark">{subject.code || '-'}</td>
                     <td className="py-3 px-4 text-sm text-text-muted">Grade {subject.grade}</td>
                     <td className="py-3 px-4 text-sm text-text-muted">{subject.description || '-'}</td>

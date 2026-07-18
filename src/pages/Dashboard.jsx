@@ -4,8 +4,9 @@ import { useSettings } from '../contexts/SettingsContext'
 import { Link } from 'react-router-dom'
 import { GraduationCap, User, Users, School, FileText, Award, DollarSign, Calendar, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { studentsApi, teachersApi, classroomsApi, feesApi, expensesApi, issuesApi, parentsApi, teacherApi } from '../services/api'
+import { studentsApi, teachersApi, classroomsApi, feesApi, expensesApi, paymentsApi, issuesApi, parentsApi, teacherApi } from '../services/api'
 import PageHeader from '../components/PageHeader'
+import { subscribeToAccountRefresh } from '../utils/accountRefresh'
 
 // Admin Dashboard
 function AdminDashboard() {
@@ -448,6 +449,8 @@ function TeacherDashboard() {
     )
   }
 
+  const totalStudents = classrooms.reduce((sum, classroom) => sum + (classroom.students?.length || 0), 0)
+
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 p-3 sm:p-4 lg:p-6">
       <div>
@@ -463,25 +466,25 @@ function TeacherDashboard() {
             <School className="text-blue-500" size={24} />
           </div>
           <p className="text-2xl sm:text-3xl font-semibold text-text-dark">{classrooms.length}</p>
-          <p className="text-xs sm:text-sm text-text-muted mt-2">Classrooms assigned</p>
+          <p className="text-xs sm:text-sm text-text-muted mt-2">Assigned classrooms</p>
+        </div>
+
+        <div className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 border-t-4 border-t-amber-500">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs sm:text-sm text-text-muted font-medium">Students</p>
+            <Users className="text-amber-500" size={24} />
+          </div>
+          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">{totalStudents}</p>
+          <p className="text-xs sm:text-sm text-text-muted mt-2">Students across classes</p>
         </div>
 
         <Link to="/timetable" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 border-t-4 border-t-green-500 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs sm:text-sm text-text-muted font-medium">Attendance</p>
+            <p className="text-xs sm:text-sm text-text-muted font-medium">Schedule</p>
             <Calendar className="text-green-500" size={24} />
           </div>
-          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">Mark</p>
-          <p className="text-xs sm:text-sm text-text-muted mt-2">Student presence</p>
-        </Link>
-
-        <Link to="/results" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 border-t-4 border-t-purple-500 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs sm:text-sm text-text-muted font-medium">Results</p>
-            <Award className="text-purple-500" size={24} />
-          </div>
-          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">Manage</p>
-          <p className="text-xs sm:text-sm text-text-muted mt-2">Grades & scores</p>
+          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">View</p>
+          <p className="text-xs sm:text-sm text-text-muted mt-2">Class timetable</p>
         </Link>
       </div>
 
@@ -539,11 +542,11 @@ function TeacherDashboard() {
       <div>
         <h2 className="text-lg sm:text-xl font-semibold text-text-dark mb-3 sm:mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-          <Link to="/timetable" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 hover:shadow-lg transition-shadow flex items-center gap-4">
+          <Link to="/attendance" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 hover:shadow-lg transition-shadow flex items-center gap-4">
             <Calendar className="text-green-500" size={32} />
             <div>
               <h3 className="font-semibold text-text-dark text-sm sm:text-base">Mark Attendance</h3>
-              <p className="text-xs sm:text-sm text-text-muted">Daily records</p>
+              <p className="text-xs sm:text-sm text-text-muted">Daily student presence</p>
             </div>
           </Link>
 
@@ -555,13 +558,13 @@ function TeacherDashboard() {
             </div>
           </Link>
 
-          <div className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 flex items-center gap-4">
+          <Link to="/timetable" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 hover:shadow-lg transition-shadow flex items-center gap-4">
             <School className="text-blue-500" size={32} />
             <div>
-              <h3 className="font-semibold text-text-dark text-sm sm:text-base">Classes</h3>
-              <p className="text-xs sm:text-sm text-blue-600">{classrooms.length} assigned</p>
+              <h3 className="font-semibold text-text-dark text-sm sm:text-base">My Timetable</h3>
+              <p className="text-xs sm:text-sm text-text-muted">View class schedule</p>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
     </div>
@@ -606,6 +609,15 @@ function StudentDashboard() {
           </div>
           <p className="text-2xl sm:text-3xl font-semibold text-text-dark">View</p>
           <p className="text-xs sm:text-sm text-text-muted mt-2">Your grades</p>
+        </Link>
+
+        <Link to="/student-account" className="bg-card-white rounded-custom shadow-custom p-4 sm:p-6 border-t-4 border-t-amber-500 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs sm:text-sm text-text-muted font-medium">My Account</p>
+            <DollarSign className="text-amber-500" size={24} />
+          </div>
+          <p className="text-2xl sm:text-3xl font-semibold text-text-dark">Track</p>
+          <p className="text-xs sm:text-sm text-text-muted mt-2">Fees and payments</p>
         </Link>
       </div>
 
@@ -659,19 +671,20 @@ function AccountsDashboard() {
   const loadStats = async () => {
     try {
       setError(null)
-      const [fees, expenses] = await Promise.all([
+      const [fees, expenses, payments] = await Promise.all([
         feesApi.list(),
-        expensesApi.list()
+        expensesApi.list(),
+        paymentsApi.list()
       ])
       
-      const totalFees = fees.reduce((sum, f) => sum + f.amount, 0)
-      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-      const paidFees = fees.filter(f => f.status === 'PAID').reduce((sum, f) => sum + f.amount, 0)
+      const totalFees = fees.reduce((sum, f) => sum + (f.amount || 0), 0)
+      const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+      const totalPayments = payments.reduce((sum, p) => sum + (p.amount || p.paidAmount || p.amountPaid || 0), 0)
       
       setStats({
         totalFees,
         totalExpenses,
-        totalPayments: paidFees
+        totalPayments
       })
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -714,9 +727,17 @@ function AccountsDashboard() {
 
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 p-3 sm:p-4 lg:p-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-text-dark">Accounts Dashboard</h1>
-        <p className="text-sm sm:text-base text-text-muted mt-1">Financial overview</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-text-dark">Accounts Dashboard</h1>
+          <p className="text-sm sm:text-base text-text-muted mt-1">Financial overview</p>
+        </div>
+        <button
+          onClick={loadStats}
+          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-text-dark shadow-sm hover:bg-slate-50 transition"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Stat Cards */}
